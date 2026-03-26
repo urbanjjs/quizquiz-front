@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>퀴즈 관리자</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* ── 레이아웃 ── */
+.admin-wrap { max-width: 960px; margin: 0 auto; padding: 28px 18px 80px; }
+
+/* ── 헤더 ── */
+.admin-header {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 24px; flex-wrap: wrap;
+}
+.admin-header h1 { font-size: 22px; font-weight: 900; margin-right: auto; }
+
+/* ── 탭 ── */
+.tab-bar {
+  display: flex; gap: 0;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 22px;
+}
+.tab-item {
+  flex: 1; padding: 10px 16px;
+  border: none; border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+  text-align: center;
+}
+.tab-item.active { background: var(--primary); color: #fff; }
+
+/* ── 통계 카드 ── */
+.stat-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 22px; }
+.stat-box {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; text-align: center;
+}
+.stat-box .val { font-size: 26px; font-weight: 900; color: var(--primary-l); }
+.stat-box .lbl { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* ── 필터/검색 ── */
+.toolbar {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  align-items: center; margin-bottom: 14px;
+}
+.toolbar select, .toolbar input {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  font-family: inherit; font-size: 13px;
+  padding: 8px 12px; outline: none;
+  transition: border-color .15s;
+}
+.toolbar select:focus, .toolbar input:focus { border-color: var(--primary); }
+.toolbar input { flex: 1; min-width: 160px; }
+
+/* ── 테이블 ── */
+.quiz-table-wrap { overflow-x: auto; margin-bottom: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  background: var(--surface2); color: var(--muted);
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
+  padding: 10px 12px; text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+td { padding: 10px 12px; border-bottom: 1px solid rgba(42,42,80,.5); vertical-align: middle; }
+tr:hover td { background: rgba(108,99,255,.04); }
+.q-text-cell { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.action-cell { display: flex; gap: 6px; }
+
+/* ── 폼 ── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-grid.full { grid-template-columns: 1fr; }
+.form-section-title {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px;
+  margin: 16px 0 8px; grid-column: 1/-1;
+}
+.options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.opt-label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.opt-label span { min-width: 20px; font-weight: 700; color: var(--primary-l); }
+
+.answer-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.ans-btn {
+  padding: 8px 16px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted); font-family: inherit; font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+}
+.ans-btn.active { border-color: var(--accent); background: rgba(67,233,123,.15); color: var(--accent); }
+
+/* ── 상황 카드 ── */
+.sit-card {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.sit-card:hover { border-color: #4da3ff; transform: translateY(-1px); }
+.sit-card.selected { border-color: var(--primary); background: rgba(108,99,255,.12); }
+.sit-card .sit-title { font-size: 13px; font-weight: 800; margin-bottom: 3px; }
+.sit-card .sit-subs  { font-size: 10px; color: var(--muted); line-height: 1.5; }
+.sit-card .sit-count { font-size: 10px; color: var(--primary-l); margin-top: 4px; }
+
+/* ── 소분류 칩 ── */
+.sub-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.sub-chip {
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  font-size: 12px; color: var(--muted);
+  cursor: pointer; transition: all .15s;
+}
+.sub-chip:hover { border-color: var(--primary-l); color: var(--text); }
+.sub-chip.selected { border-color: var(--primary); background: rgba(108,99,255,.15); color: var(--primary-l); }
+
+/* ── AI/JSON 임포트 ── */
+.import-area {
+  width: 100%;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: 'Courier New', monospace; font-size: 12px;
+  padding: 14px; outline: none;
+  resize: vertical; min-height: 200px;
+  transition: border-color .15s;
+  line-height: 1.6;
+}
+.import-area:focus { border-color: var(--primary); }
+
+.prompt-box {
+  background: rgba(108,99,255,.08);
+  border: 1px solid rgba(108,99,255,.25);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13px; color: #a8a8e8;
+  line-height: 1.8; margin-bottom: 14px;
+  font-family: 'Courier New', monospace;
+}
+.copy-prompt-btn {
+  font-size: 12px; padding: 6px 14px;
+  margin-top: 8px;
+}
+
+/* 페이지네이션 */
+.pagination { display: flex; gap: 6px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+.page-btn {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface2); color: var(--muted);
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.page-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.page-btn:hover:not(.active) { border-color: var(--primary-l); color: var(--text); }
+
+/* 확인 모달 */
+.confirm-modal { max-width: 360px; }
+</style>
+</head>
+<body>
+
+<div class="topbar" id="topbar"></div>
+
+<div class="admin-wrap">
+  <div class="admin-header">
+    <h1>📝 퀴즈 관리자</h1>
+    <a href="lobby.html" class="btn btn-ghost btn-sm">← 로비로</a>
+  </div>
+
+  <!-- 탭 -->
+  <div class="tab-bar">
+    <button class="tab-item active" data-tab="list">📋 문제 목록</button>
+    <button class="tab-item" data-tab="add">➕ 문제 추가</button>
+    <button class="tab-item" data-tab="import">🇺🇸 AI 생활영어 생성</button>
+  </div>
+
+  <!-- ══ TAB: 목록 ══ -->
+  <div id="tab-list">
+    <!-- 통계 -->
+    <div class="stat-row" id="statRow">
+      <div class="stat-box"><div class="val" id="statTotal">-</div><div class="lbl">전체 문제</div></div>
+      <div class="stat-box"><div class="val" id="stat0">-</div><div class="lbl">일반상식</div></div>
+      <div class="stat-box"><div class="val" id="stat1">-</div><div class="lbl">역사/사회</div></div>
+      <div class="stat-box"><div class="val" id="stat2">-</div><div class="lbl">과학/IT</div></div>
+      <div class="stat-box"><div class="val" id="stat3">-</div><div class="lbl">언어/영어</div></div>
+      <div class="stat-box"><div class="val" id="stat4">-</div><div class="lbl">시사/뉴스</div></div>
+      <div class="stat-box" style="border-color:rgba(77,163,255,.4)"><div class="val" id="stat5" style="color:#7ec8ff">-</div><div class="lbl">생활영어</div></div>
+    </div>
+
+    <!-- 필터 -->
+    <div class="toolbar">
+      <input type="text" id="searchInput" placeholder="🔍 문제 검색...">
+      <select id="filterCat">
+        <option value="">전체 카테고리</option>
+        <option value="일반상식">일반상식</option>
+        <option value="역사사회">역사/사회</option>
+        <option value="과학IT">과학/IT</option>
+        <option value="언어영어">언어/영어</option>
+        <option value="시사뉴스">시사/뉴스</option>
+      </select>
+      <select id="filterType">
+        <option value="">전체 유형</option>
+        <option value="multiple">4지선다</option>
+        <option value="ox">OX 퀴즈</option>
+      </select>
+      <select id="filterDiff">
+        <option value="">전체 난이도</option>
+        <option value="easy">쉬움</option>
+        <option value="medium">보통</option>
+        <option value="hard">어려움</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" id="resetFilterBtn">초기화</button>
+    </div>
+
+    <!-- 테이블 -->
+    <div class="quiz-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>문제</th>
+            <th>카테고리</th>
+            <th>유형</th>
+            <th>정답</th>
+            <th>난이도</th>
+            <th>관리</th>
+          </tr>
+        </thead>
+        <tbody id="quizTbody">
+          <tr><td colspan="7" style="text-align:center;padding:30px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <!-- ══ TAB: 추가/수정 ══ -->
+  <div id="tab-add" style="display:none">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div style="font-size:16px;font-weight:900" id="formTitle">➕ 새 문제 추가</div>
+        <button class="btn btn-ghost btn-sm" id="resetFormBtn">초기화</button>
+      </div>
+
+      <div class="form-grid">
+        <!-- 카테고리 -->
+        <div class="input-group">
+          <label>카테고리</label>
+          <select class="input-field" id="fCat">
+            <option value="일반상식">🌍 일반상식</option>
+            <option value="역사사회">📜 역사/사회</option>
+            <option value="과학IT">🔬 과학/IT</option>
+            <option value="언어영어">🔤 언어/영어</option>
+            <option value="시사뉴스">📰 시사/뉴스</option>
+          </select>
+        </div>
+        <!-- 유형 -->
+        <div class="input-group">
+          <label>문제 유형</label>
+          <select class="input-field" id="fType">
+            <option value="multiple">4지선다</option>
+            <option value="ox">OX 퀴즈</option>
+          </select>
+        </div>
+        <!-- 난이도 -->
+        <div class="input-group">
+          <label>난이도</label>
+          <select class="input-field" id="fDiff">
+            <option value="easy">⭐ 쉬움</option>
+            <option value="medium">⭐⭐ 보통</option>
+            <option value="hard">⭐⭐⭐ 어려움</option>
+          </select>
+        </div>
+        <!-- 문제 -->
+        <div class="input-group form-grid full" style="grid-column:1/-1">
+          <label>문제 내용</label>
+          <input class="input-field" type="text" id="fQuestion" placeholder="문제를 입력하세요..." maxlength="200">
+        </div>
+      </div>
+
+      <!-- 4지선다 보기 -->
+      <div id="optionsSection">
+        <div class="form-section-title" style="margin-top:4px">보기</div>
+        <div class="options-grid">
+          <div class="input-group">
+            <div class="opt-label"><span>A</span><input class="input-field" type="text" id="fA" placeholder="보기 A" maxlength="100"></div>
+          </div>
+          <div class="input-group">
+            <div class="opt-label"><span>B</span><input class="input-field" type="text" id="fB" placeholder="보기 B" maxlength="100"></div>
+          </div>
+          <div class="input-group">
+            <div class="opt-label"><span>C</span><input class="input-field" type="text" id="fC" placeholder="보기 C" maxlength="100"></div>
+          </div>
+          <div class="input-group">
+            <div class="opt-label"><span>D</span><input class="input-field" type="text" id="fD" placeholder="보기 D" maxlength="100"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 정답 -->
+      <div class="input-group">
+        <label>정답</label>
+        <div class="answer-btns" id="answerBtns"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-ghost" id="cancelEditBtn" style="display:none">취소</button>
+        <button class="btn btn-accent btn-full btn-lg" id="saveQuizBtn">💾 저장하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TAB: AI 생성 (전면 개선) ══ -->
+  <div id="tab-import" style="display:none">
+
+    <!-- ① 상황 분류 체계 — 100개 카드 -->
+    <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,rgba(77,163,255,.06),rgba(67,233,123,.04));border-color:rgba(77,163,255,.2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:15px;font-weight:900">🗂️ 100개 상황 체계</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">10대 분야 × 10개 세부상황 — 카드를 클릭하면 자동 선택</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="fieldFilterBtns">
+          <button class="sub-chip selected" data-filter="all">전체</button>
+        </div>
+      </div>
+      <div id="situationMapGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:8px"></div>
+    </div>
+
+    <!-- ② AI 프롬프트 생성기 -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:15px;font-weight:900;margin-bottom:4px">🤖 AI 프롬프트 자동 생성기</div>
+      <p class="text-muted text-sm" style="margin-bottom:14px">카드 클릭 → 소분류 선택 → <strong>프롬프트 생성</strong> → ChatGPT/Claude에 붙여넣기 → <strong>30초</strong>면 20문제 완성!</p>
+
+      <!-- 선택된 상황 표시 -->
+      <div id="selectedSitBadge" style="display:none;background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span id="selectedSitText" style="font-weight:700;font-size:13px"></span>
+        <span style="font-size:12px;color:var(--muted)" id="selectedSubText"></span>
+        <button class="sub-chip" id="clearSitBtn" style="margin-left:auto;font-size:11px">✕ 초기화</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:14px">
+        <!-- 카테고리 -->
+        <div class="input-group" style="margin:0">
+          <label style="font-size:11px">📚 카테고리</label>
+          <select class="input-field" id="promptCat">
+            <option value="생활영어">🇺🇸 생활영어</option>
+            <option value="일반상식">🌍 일반상식</option>
+            <option value="역사사회">📜 역사/사회</option>
+            <option value="과학IT">🔬 과학/IT</option>
+            <option value="언어영어">🔤 언어/영어</option>
+            <option value="시사뉴스">📰 시사/뉴스</option>
+          </select>
+        </div>
+        <!-- 상황 대분류 (동적) -->
+        <div class="input-group" style="margin:0" id="sitMainGroup">
+          <label style="font-size:11px">🗺️ 상황 대분류 (10개 분야)</label>
+          <select class="input-field" id="promptSitMain">
+            <!-- JS로 채움 -->
+          </select>
+        </div>
+        <!-- 소분류 드롭다운 (동적) -->
+        <div class="input-group" style="margin:0" id="sitSubGroup">
+          <label style="font-size:11px">🔍 세부 상황 (소분류 선택)</label>
+          <select class="input-field" id="promptSitSub">
+            <!-- JS로 채움 -->
+          </select>
+        </div>
+        <!-- 퀴즈 유형 -->
+        <div class="input-group" style="margin:0">
+          <label style="font-size:11px">🎯 퀴즈 유형 비율</label>
+          <select class="input-field" id="promptType">
+            <option value="mix">표현50% + 번역40% + 어휘10%</option>
+            <option value="expression">표현 100% (expression)</option>
+            <option value="translate">번역 100% (translate)</option>
+            <option value="vocab">어휘 100% (vocab)</option>
+          </select>
+        </div>
+        <!-- 난이도 -->
+        <div class="input-group" style="margin:0">
+          <label style="font-size:11px">⭐ 난이도</label>
+          <select class="input-field" id="promptDiff">
+            <option value="mix">혼합 (easy4 medium4 hard2)</option>
+            <option value="easy">쉬움 위주</option>
+            <option value="medium">보통 위주</option>
+            <option value="hard">어려움 위주</option>
+          </select>
+        </div>
+        <!-- 문제 수 -->
+        <div class="input-group" style="margin:0">
+          <label style="font-size:11px">📝 문제 수</label>
+          <select class="input-field" id="promptCount">
+            <option value="10">10문제</option>
+            <option value="15">15문제</option>
+            <option value="20">20문제 (권장)</option>
+            <option value="30">30문제 (최대)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 생성된 프롬프트 박스 -->
+      <div style="position:relative">
+        <div class="prompt-box" id="promptBox" style="min-height:180px;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-all"></div>
+        <button class="btn btn-sm" id="copyPromptBtn"
+          style="position:absolute;top:8px;right:8px;background:rgba(108,99,255,.3);color:#fff;border:1px solid rgba(108,99,255,.5)">
+          📋 복사
+        </button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" id="genPromptBtn">⚙️ 프롬프트 생성</button>
+        <a href="https://chat.openai.com" target="_blank" class="btn btn-sm" style="background:#10a37f;color:#fff">ChatGPT 열기 →</a>
+        <a href="https://claude.ai" target="_blank" class="btn btn-sm" style="background:#c07850;color:#fff">Claude 열기 →</a>
+      </div>
+    </div>
+
+    <!-- ③ JSON 임포트 -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:15px;font-weight:900;margin-bottom:4px">📥 JSON 붙여넣기 & 등록</div>
+      <p class="text-muted text-sm" style="margin-bottom:12px">AI가 생성한 JSON 배열을 붙여넣고 검증 후 일괄 등록합니다.</p>
+
+      <!-- 빠른 ID 접두사 -->
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <label style="font-size:12px;color:var(--muted);white-space:nowrap">ID 접두사:</label>
+        <input class="input-field" id="idPrefix" placeholder="예: eng_home" style="width:140px;font-size:13px" value="eng_new">
+        <span style="font-size:11px;color:var(--muted)">→ eng_new_001, eng_new_002 ... 자동 채번</span>
+      </div>
+
+      <textarea class="import-area" id="jsonInput" placeholder='AI가 생성한 JSON을 여기에 붙여넣으세요.
+
+예시:
+[
+  {
+    "category": "생활영어",
+    "type": "expression",
+    "situation": "식당",
+    "situation_sub": "주문하기",
+    "question": "식당에서 주문을 변경하고 싶을 때?",
+    "option_a": "Actually, can I change my order?",
+    "option_b": "I want to change my order.",
+    "option_c": "Please change what I said.",
+    "option_d": "My order is different.",
+    "answer": "A",
+    "difficulty": "easy",
+    "hint": "Actually를 앞에 붙이면 더 자연스럽고 공손해요.",
+    "en_sentence": "Actually, can I change my order? I'd like the pasta instead."
+  }
+]'></textarea>
+
+      <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary btn-lg" id="validateBtn">🔍 검증하기</button>
+        <button class="btn btn-accent btn-lg" id="importBtn" disabled>📥 일괄 등록</button>
+        <span id="validateMsg" class="text-sm text-muted"></span>
+      </div>
+      <div id="previewTable" style="margin-top:16px"></div>
+    </div>
+
+    <!-- ④ 워크플로우 가이드 -->
+    <div class="card" style="background:var(--surface2)">
+      <div style="font-size:13px;font-weight:900;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">📖 사용 가이드 — 2분 만에 문제 20개 등록하기</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="min-width:28px;height:28px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">1</span>
+          <div><strong>상황 선택</strong> — 대분류 + 소분류 입력 (예: 식당 → "주문하기")</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="min-width:28px;height:28px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">2</span>
+          <div><strong>프롬프트 생성</strong> → <strong>📋 복사</strong> 클릭</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="min-width:28px;height:28px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0">3</span>
+          <div><strong>ChatGPT / Claude 열기</strong> → 붙여넣기 → JSON 응답 복사</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="min-width:28px;height:28px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#0a1a10;flex-shrink:0">4</span>
+          <div><strong>JSON 붙여넣기</strong> → <strong>🔍 검증</strong> → <strong>📥 일괄 등록</strong> 완료!</div>
+        </div>
+        <div style="background:rgba(67,233,123,.08);border:1px solid rgba(67,233,123,.2);border-radius:10px;padding:10px 14px;font-size:13px;margin-top:4px">
+          💡 <strong>팁:</strong> 20문제씩 × 5회 = <strong>100문제</strong> 등록에 약 10분 소요. 상황 100개 × 10문제 = 총 <strong>1,000문제</strong>도 가능!
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 수정 모달 -->
+<div class="modal-bg" id="editModal" style="display:none">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title">✏️ 문제 수정</div>
+    <div id="editFormContent"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-full" id="closeEditModal">취소</button>
+      <button class="btn btn-primary btn-full" id="saveEditBtn">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 삭제 확인 모달 -->
+<div class="modal-bg" id="deleteModal" style="display:none">
+  <div class="modal confirm-modal">
+    <div class="modal-title">🗑️ 문제 삭제</div>
+    <p class="text-muted" style="font-size:14px;margin-bottom:6px">정말 이 문제를 삭제할까요?</p>
+    <p id="deleteQuestionText" style="font-size:14px;font-weight:700;padding:12px;background:var(--surface2);border-radius:8px;margin-bottom:4px"></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-full" id="cancelDeleteBtn">취소</button>
+      <button class="btn btn-danger btn-full" id="confirmDeleteBtn">삭제</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const user = Auth.require();
+renderTopbar(user);
+
+/* ══════════════════ 상태 ══════════════════ */
+let allQuizzes = [];
+let filtered = [];
+let currentPage = 1;
+const PAGE_SIZE = 15;
+let editingId = null;
+let deleteTargetId = null;
+let pendingImport = [];
+let currentAnswerSel = 'A';
+
+const CATS = ['일반상식','역사사회','과학IT','언어영어','시사뉴스','생활영어'];
+const CAT_LABELS = {'일반상식':'🌍 일반상식','역사사회':'📜 역사/사회','과학IT':'🔬 과학/IT','언어영어':'🔤 언어/영어','시사뉴스':'📰 시사/뉴스','생활영어':'🇺🇸 생활영어'};
+const DIFF_LABELS = {easy:'⭐ 쉬움', medium:'⭐⭐ 보통', hard:'⭐⭐⭐ 어려움'};
+
+/* ── 100개 상황 체계 정의 (10대 분야 × 10개 세부상황) ── */
+const SITUATION_MAP = [
+  { main:'가정생활', icon:'🏠', label:'가정생활', eng:'Home & Family',
+    subs:['아침 루틴·준비','요리·식사 준비','청소·정리정돈','가전·수리 고장','손님 접대·맞이','취침·밤 루틴','반려동물 돌봄','재택근무·홈오피스','인테리어·집꾸미기','이사·임대·계약'] },
+  { main:'직장업무', icon:'💼', label:'직장업무', eng:'Workplace',
+    subs:['회의·프레젠테이션','업무 지시·요청','동료 협업·소통','전화·이메일 업무','성과 보고·평가','점심·커피 브레이크','신입 직원 교육','출장·비즈니스 여행','재택근무·원격협업','퇴사·이직·면접'] },
+  { main:'여행교통', icon:'✈️', label:'여행교통', eng:'Travel & Transport',
+    subs:['공항 체크인·수속','기내 서비스·좌석','입국 심사·세관','수하물 찾기·분실','렌터카·드라이브','기차·버스 예약','지하철·버스 탑승','택시·우버 호출','지연·취소·환불','길 묻기·내비'] },
+  { main:'음식외식', icon:'🍽️', label:'음식외식', eng:'Food & Dining',
+    subs:['레스토랑 예약','자리 안내·착석','메뉴 추천·설명','주문하기·변경','알레르기·식이제한','스테이크 굽기 선택','계산·영수증 요청','불만·컴플레인 처리','카페·디저트 주문','배달·포장 주문'] },
+  { main:'쇼핑소비', icon:'🛍️', label:'쇼핑소비', eng:'Shopping',
+    subs:['의류 쇼핑·피팅룸','가격 흥정·할인 요청','계산대·결제','교환·환불 요청','선물 포장·추천','재고 확인·주문','백화점 안내 요청','온라인 쇼핑·배송','마트·식료품 쇼핑','면세점·명품 쇼핑'] },
+  { main:'의료건강', icon:'🏥', label:'의료건강', eng:'Health & Medical',
+    subs:['병원 예약·접수','증상 설명하기','검사·진단 받기','처방전·약국','의료보험·결제','응급실·긴급상황','치과 치료','안과·피부과','산부인과·소아과','정신건강 상담'] },
+  { main:'교육학교', icon:'🏫', label:'교육학교', eng:'Education',
+    subs:['결석·지각 연락','수업 중 질문하기','과제·시험 문의','성적·학점 상담','동아리·과외 활동','기숙사·학생식당','도서관 이용','교환학생 프로그램','입학 지원·면접','졸업·수료 행사'] },
+  { main:'여가취미', icon:'🎭', label:'여가취미', eng:'Leisure & Hobbies',
+    subs:['영화·공연 예매','호텔·리조트 체크인','관광지·박물관 방문','스포츠·피트니스','뷰티·스파 서비스','파티·모임 초대','데이트·소개팅','독서·카페 취미','여행 사진·SNS','온라인 게임·스트리밍'] },
+  { main:'사회관계', icon:'🤝', label:'사회관계', eng:'Social Situations',
+    subs:['처음 만남·자기소개','감사·칭찬 표현','사과·양해 구하기','이웃·주민 소통','파티 소셜 대화','전화·메시지 대화','SNS 댓글·반응','의견 제시·토론','초대·거절하기','작별·재만남 약속'] },
+  { main:'긴급위기', icon:'🚨', label:'긴급위기', eng:'Emergency & Crisis',
+    subs:['사고·부상 신고','화재·대피 상황','분실물·도난 신고','길 잃음·조난','언어 장벽 도움','차량 고장·견인','자연재해·경보','폭력·위협 상황','긴급 의료 연락','대사관·긴급연락처'] }
+];
+
+// 총 100개 소분류 (10 × 10) 검증
+// SITUATION_MAP.reduce((a,s)=>a+s.subs.length,0) === 100
+
+/* ══════════════════ 탭 전환 ══════════════════ */
+document.querySelectorAll('.tab-item').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    ['list','add','import'].forEach(id => document.getElementById('tab-'+id).style.display = 'none');
+    this.classList.add('active');
+    document.getElementById('tab-'+this.dataset.tab).style.display = 'block';
+  });
+});
+
+/* ══════════════════ 데이터 로드 ══════════════════ */
+async function loadAll() {
+  try {
+    const res = await API.getQuizzes();
+    allQuizzes = res.data || [];
+    applyFilter();
+    updateStats();
+  } catch(e) {
+    showToast('문제를 불러올 수 없습니다.', 'error');
+  }
+}
+
+function updateStats() {
+  document.getElementById('statTotal').textContent = allQuizzes.length;
+  ['일반상식','역사사회','과학IT','언어영어','시사뉴스','생활영어'].forEach((cat, i) => {
+    const el = document.getElementById('stat'+i);
+    if (el) el.textContent = allQuizzes.filter(q => q.category === cat).length;
+  });
+}
+
+/* ── 대분류 select 채우기 ── */
+function populateSitMainSelect() {
+  const sel = document.getElementById('promptSitMain');
+  if (!sel) return;
+  sel.innerHTML = SITUATION_MAP.map(s =>
+    `<option value="${s.main}">${s.icon} ${s.label} (${s.eng})</option>`
+  ).join('');
+}
+
+/* ── 소분류 select 채우기 (대분류 연동) ── */
+function populateSitSubSelect(mainVal) {
+  const sel = document.getElementById('promptSitSub');
+  if (!sel) return;
+  const info = SITUATION_MAP.find(s => s.main === mainVal);
+  if (!info) return;
+  sel.innerHTML = `<option value="">-- 전체 (랜덤 혼합) --</option>` +
+    info.subs.map(sub => `<option value="${sub}">${sub}</option>`).join('');
+}
+
+/* ── 상황 맵 그리드 렌더 ── */
+let selectedSitMain = '';
+function renderSituationMap(filter) {
+  const grid = document.getElementById('situationMapGrid');
+  if (!grid) return;
+  const list = filter && filter !== 'all'
+    ? SITUATION_MAP.filter(s => s.main === filter)
+    : SITUATION_MAP;
+
+  grid.innerHTML = list.map(s => `
+    <div class="sit-card ${selectedSitMain===s.main?'selected':''}" onclick="selectSituation('${s.main}')" id="sitcard-${s.main}">
+      <div class="sit-title">${s.icon} ${s.label}</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:3px">${s.eng}</div>
+      <div class="sit-subs">${s.subs.slice(0,5).join(' · ')}${s.subs.length>5?'…':''}</div>
+      <div class="sit-count">📌 ${s.subs.length}개 세부상황</div>
+    </div>`).join('');
+}
+
+function selectSituation(sit) {
+  selectedSitMain = sit;
+  const info = SITUATION_MAP.find(s => s.main === sit);
+
+  // 대분류 select 업데이트
+  const sitSel = document.getElementById('promptSitMain');
+  if (sitSel) sitSel.value = sit;
+
+  // 소분류 select 업데이트
+  populateSitSubSelect(sit);
+
+  // 카테고리 강제
+  document.getElementById('promptCat').value = '생활영어';
+
+  // 배지 표시
+  const badge = document.getElementById('selectedSitBadge');
+  if (badge) {
+    badge.style.display = 'flex';
+    document.getElementById('selectedSitText').textContent = info.icon + ' ' + info.label + ' (' + info.eng + ')';
+    document.getElementById('selectedSubText').textContent = '소분류: ' + info.subs.join(', ');
+  }
+
+  // ID 접두사 자동 설정
+  const prefixMap = {
+    '가정생활':'eng_home','직장업무':'eng_work','여행교통':'eng_travel',
+    '음식외식':'eng_food','쇼핑소비':'eng_shop','의료건강':'eng_health',
+    '교육학교':'eng_edu','여가취미':'eng_leisure','사회관계':'eng_social','긴급위기':'eng_emergency'
+  };
+  const pfx = document.getElementById('idPrefix');
+  if (pfx && prefixMap[sit]) pfx.value = prefixMap[sit];
+
+  // 그리드 선택 표시 업데이트
+  document.querySelectorAll('.sit-card').forEach(c => c.classList.remove('selected'));
+  const card = document.getElementById('sitcard-' + sit);
+  if (card) card.classList.add('selected');
+
+  showToast('✅ ' + info.label + ' 선택! 소분류를 고르고 프롬프트 생성 클릭 🚀', 'success');
+  buildPrompt();
+}
+
+/* ── 프롬프트 생성기 ── */
+function buildPrompt() {
+  const cat      = document.getElementById('promptCat').value;
+  const sitMain  = document.getElementById('promptSitMain') ? document.getElementById('promptSitMain').value : '';
+  const sitSubEl = document.getElementById('promptSitSub');
+  const sitSub   = sitSubEl ? sitSubEl.options[sitSubEl.selectedIndex]?.text || '' : '';
+  const sitSubVal= sitSubEl ? sitSubEl.value : '';
+  const typeOpt  = document.getElementById('promptType').value;
+  const diffOpt  = document.getElementById('promptDiff').value;
+  const count    = parseInt(document.getElementById('promptCount').value);
+  const prefix   = document.getElementById('idPrefix') ? document.getElementById('idPrefix').value.trim() || 'eng_new' : 'eng_new';
+  const isEng    = cat === '생활영어';
+
+  // 유형 분배
+  let typeDesc = '';
+  if (typeOpt === 'mix')             typeDesc = `expression ${Math.ceil(count*0.5)}개 (표현 선택), translate ${Math.ceil(count*0.35)}개 (한→영 번역), vocab ${count - Math.ceil(count*0.5) - Math.ceil(count*0.35)}개 (어휘 뜻)`;
+  else if (typeOpt === 'expression') typeDesc = `expression ${count}개 — 자연스러운 영어 표현 4지선다`;
+  else if (typeOpt === 'translate')  typeDesc = `translate ${count}개 — 한국어 상황 → 영어 번역 4지선다`;
+  else                               typeDesc = `vocab ${count}개 — 영어 단어/표현의 한국어 뜻 고르기`;
+
+  // 난이도 분배
+  let diffDesc = '';
+  if      (diffOpt === 'mix')    diffDesc = `easy ${Math.ceil(count*0.4)}개(초급), medium ${Math.ceil(count*0.4)}개(중급), hard ${count - Math.ceil(count*0.4)*2}개(고급)`;
+  else if (diffOpt === 'easy')   diffDesc = `easy ${Math.ceil(count*0.7)}개, medium ${count - Math.ceil(count*0.7)}개 — 초보자 대상`;
+  else if (diffOpt === 'medium') diffDesc = `medium ${Math.ceil(count*0.7)}개, hard ${count - Math.ceil(count*0.7)}개 — 중급자 대상`;
+  else                           diffDesc = `hard ${Math.ceil(count*0.6)}개, medium ${count - Math.ceil(count*0.6)}개 — 고급자 대상`;
+
+  const sitInfo = SITUATION_MAP.find(s => s.main === sitMain);
+  const subList = sitInfo ? sitInfo.subs.join(', ') : '';
+
+  const situationBlock = isEng ? `상황 대분류: "${sitMain}" (${sitInfo?.eng || ''})
+소분류 / 세부 장면: "${sitSubVal ? sitSub : '아래 소분류 중 골고루 선택 → ' + subList}"
+` : '';
+
+  const prompt = `아래 JSON 형식으로 생활영어 퀴즈 ${count}문제를 만들어줘.
+
+카테고리: "${cat}"
+${situationBlock}퀴즈 유형 구성: ${typeDesc}
+난이도 구성: ${diffDesc}
+
+⚠️ 필수 규칙 (반드시 지켜줘):
+1. question: 한국어로 "상황 묘사 + 질문" 형태 (예: "레스토랑에서 주문을 변경하고 싶을 때 가장 자연스러운 표현은?")
+2. option_a~d: 모두 영어, 오답도 헷갈릴 만큼 실제처럼 작성 (문법적으로 틀리지 않게)
+3. answer: A, B, C, D 중 하나만
+4. hint: 왜 이 표현이 맞는지 한국어 설명 + 유사 표현 예시 (30~60자)
+5. en_sentence: 정답 영어가 포함된 자연스러운 실제 대화 예문 1~2문장
+6. id: "${prefix}_001" 형식 순번
+7. translate 문제: question에 번역할 한국어 문장 포함
+8. vocab 문제: question에 "다음 영어 표현의 뜻은?" 형태로 영어 포함
+
+JSON 배열 (순수 JSON만, 설명 없이):
+[
+  {
+    "id": "${prefix}_001",
+    "category": "${cat}",
+    "type": "expression | translate | vocab 중 하나",
+${isEng ? `    "situation": "${sitMain}",
+    "situation_sub": "${sitSubVal || '소분류명'}",` : ''}
+    "difficulty": "easy | medium | hard 중 하나",
+    "question": "문제 내용 (한국어 상황 설명 포함)",
+    "option_a": "영어 선택지",
+    "option_b": "영어 선택지",
+    "option_c": "영어 선택지",
+    "option_d": "영어 선택지",
+    "answer": "A",
+    "hint": "해설 한국어 (30~60자, 유사표현 포함)",
+    "en_sentence": "정답 포함 영어 실제 대화 예문"
+  },
+  ... (총 ${count}개)
+]`;
+
+  document.getElementById('promptBox').textContent = prompt;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  // 대분류 select 채우기
+  populateSitMainSelect();
+  // 소분류 초기 채우기
+  const firstMain = SITUATION_MAP[0].main;
+  populateSitSubSelect(firstMain);
+
+  // 상황 그리드 렌더
+  renderSituationMap();
+  buildPrompt();
+
+  // 대분류 변경 → 소분류 업데이트
+  const sitMainSel = document.getElementById('promptSitMain');
+  if (sitMainSel) {
+    sitMainSel.addEventListener('change', function() {
+      populateSitSubSelect(this.value);
+      selectedSitMain = this.value;
+      renderSituationMap();
+      buildPrompt();
+    });
+  }
+
+  // 소분류 변경 → 프롬프트 재생성
+  const sitSubSel = document.getElementById('promptSitSub');
+  if (sitSubSel) sitSubSel.addEventListener('change', buildPrompt);
+
+  const genBtn = document.getElementById('genPromptBtn');
+  if (genBtn) genBtn.addEventListener('click', buildPrompt);
+
+  // 프롬프트 옵션 변경 시 재생성
+  ['promptCat','promptType','promptDiff','promptCount'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', function() {
+      if (id === 'promptCat') {
+        const isEng = this.value === '생활영어';
+        document.getElementById('sitMainGroup').style.display = isEng ? '' : 'none';
+        document.getElementById('sitSubGroup').style.display  = isEng ? '' : 'none';
+      }
+      buildPrompt();
+    });
+  });
+
+  // ID 접두사 변경 시 재생성
+  const pfx = document.getElementById('idPrefix');
+  if (pfx) pfx.addEventListener('input', buildPrompt);
+
+  // 상황 초기화 버튼
+  const clearBtn = document.getElementById('clearSitBtn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      selectedSitMain = '';
+      document.getElementById('selectedSitBadge').style.display = 'none';
+      renderSituationMap();
+      buildPrompt();
+    });
+  }
+
+  const copyBtn = document.getElementById('copyPromptBtn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function() {
+      const txt = document.getElementById('promptBox').textContent;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(txt).then(() => showToast('🚀 프롬프트 복사! ChatGPT/Claude에 붙여넣기 하세요', 'success'));
+      } else {
+        fallbackCopy(txt);
+      }
+    });
+  }
+});
+
+/* ══════════════════ 필터 ══════════════════ */
+function applyFilter() {
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+  const cat    = document.getElementById('filterCat').value;
+  const type   = document.getElementById('filterType').value;
+  const diff   = document.getElementById('filterDiff').value;
+
+  filtered = allQuizzes.filter(q => {
+    if (cat  && q.category   !== cat)  return false;
+    if (type && q.type       !== type) return false;
+    if (diff && q.difficulty !== diff) return false;
+    if (search && !q.question.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  currentPage = 1;
+  renderTable();
+}
+
+['searchInput','filterCat','filterType','filterDiff'].forEach(id => {
+  document.getElementById(id).addEventListener('input', applyFilter);
+  document.getElementById(id).addEventListener('change', applyFilter);
+});
+document.getElementById('resetFilterBtn').addEventListener('click', () => {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterCat').value = '';
+  document.getElementById('filterType').value = '';
+  document.getElementById('filterDiff').value = '';
+  applyFilter();
+});
+
+/* ══════════════════ 테이블 렌더 ══════════════════ */
+function renderTable() {
+  const tbody = document.getElementById('quizTbody');
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = filtered.slice(start, start + PAGE_SIZE);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="emo">📭</div><p>문제가 없습니다.</p></div></td></tr>`;
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  const typeLabel = { multiple:'4지선다', ox:'OX' };
+  const diffBadge = { easy:'badge-accent', medium:'badge-yellow', hard:'badge-warn' };
+
+  tbody.innerHTML = page.map((q, i) => `
+    <tr>
+      <td class="text-muted text-sm">${start + i + 1}</td>
+      <td class="q-text-cell" title="${q.question}">${q.question}</td>
+      <td><span class="badge badge-primary" style="font-size:11px">${CAT_LABELS[q.category]||q.category}</span></td>
+      <td><span class="badge ${q.type==='ox'?'badge-accent':'badge-primary'}">${typeLabel[q.type]||q.type}</span></td>
+      <td><span style="font-weight:900;color:var(--accent)">${q.answer}</span></td>
+      <td><span class="badge ${diffBadge[q.difficulty]||''}">${DIFF_LABELS[q.difficulty]||q.difficulty}</span></td>
+      <td>
+        <div class="action-cell">
+          <button class="btn btn-ghost btn-sm edit-btn" data-id="${q.id}">✏️</button>
+          <button class="btn btn-danger btn-sm delete-btn" data-id="${q.id}">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+  // 수정/삭제 이벤트
+  tbody.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => openEditModal(btn.dataset.id));
+  });
+  tbody.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => openDeleteModal(btn.dataset.id));
+  });
+
+  // 페이지네이션
+  renderPagination(totalPages);
+}
+
+function renderPagination(total) {
+  const pg = document.getElementById('pagination');
+  if (total <= 1) { pg.innerHTML = ''; return; }
+  let html = '';
+  const start = Math.max(1, currentPage - 2);
+  const end   = Math.min(total, currentPage + 2);
+  if (currentPage > 1) html += `<button class="page-btn" data-p="${currentPage-1}">‹</button>`;
+  for (let i = start; i <= end; i++) {
+    html += `<button class="page-btn ${i===currentPage?'active':''}" data-p="${i}">${i}</button>`;
+  }
+  if (currentPage < total) html += `<button class="page-btn" data-p="${currentPage+1}">›</button>`;
+  pg.innerHTML = html;
+  pg.querySelectorAll('.page-btn').forEach(btn => {
+    btn.addEventListener('click', () => { currentPage = parseInt(btn.dataset.p); renderTable(); });
+  });
+}
+
+/* ══════════════════ 정답 버튼 ══════════════════ */
+function renderAnswerBtns(type, selected, containerId) {
+  const keys = type === 'ox' ? ['O','X'] : ['A','B','C','D'];
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = keys.map(k =>
+    `<button class="ans-btn ${k===selected?'active':''}" data-k="${k}">${k}</button>`
+  ).join('');
+  container.querySelectorAll('.ans-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      container.querySelectorAll('.ans-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      if (containerId === 'answerBtns') currentAnswerSel = this.dataset.k;
+    });
+  });
+}
+
+/* ══════════════════ 유형 변경 시 UI 업데이트 ══════════════════ */
+function setupTypeChange(typeSelId, answerBtnsId, optSecId) {
+  const typeSel = document.getElementById(typeSelId);
+  typeSel.addEventListener('change', function() {
+    const isOX = this.value === 'ox';
+    if (optSecId) document.getElementById(optSecId).style.display = isOX ? 'none' : 'block';
+    const cur = currentAnswerSel;
+    const validOX = ['O','X'].includes(cur);
+    const newSel = isOX ? (validOX ? cur : 'O') : (['A','B','C','D'].includes(cur) ? cur : 'A');
+    currentAnswerSel = newSel;
+    renderAnswerBtns(this.value, newSel, answerBtnsId);
+  });
+}
+setupTypeChange('fType', 'answerBtns', 'optionsSection');
+renderAnswerBtns('multiple', 'A', 'answerBtns');
+
+/* ══════════════════ 추가 폼 ══════════════════ */
+document.getElementById('saveQuizBtn').addEventListener('click', async () => {
+  const cat  = document.getElementById('fCat').value;
+  const type = document.getElementById('fType').value;
+  const diff = document.getElementById('fDiff').value;
+  const q    = document.getElementById('fQuestion').value.trim();
+  const a    = document.getElementById('fA').value.trim();
+  const b    = document.getElementById('fB').value.trim();
+  const c    = document.getElementById('fC').value.trim();
+  const d    = document.getElementById('fD').value.trim();
+  const ans  = currentAnswerSel;
+
+  if (!q) { showToast('문제 내용을 입력해주세요.'); return; }
+  if (type === 'multiple' && (!a || !b || !c || !d)) { showToast('4지선다는 보기 4개를 모두 입력해주세요.'); return; }
+
+  showLoading();
+  try {
+    const data = {
+      id: Auth.uuid(),
+      category: cat, type, difficulty: diff,
+      question: q,
+      option_a: type==='ox' ? 'O' : a,
+      option_b: type==='ox' ? 'X' : b,
+      option_c: type==='ox' ? null : c,
+      option_d: type==='ox' ? null : d,
+      answer: ans
+    };
+
+    if (editingId) {
+      await API.req('PATCH', `tables/quizzes/${editingId}`, data);
+      showToast('✅ 문제가 수정됐습니다!', 'success');
+      editingId = null;
+      document.getElementById('formTitle').textContent = '➕ 새 문제 추가';
+      document.getElementById('cancelEditBtn').style.display = 'none';
+      document.getElementById('saveQuizBtn').textContent = '💾 저장하기';
+      document.querySelector('[data-tab="add"]').className = 'tab-item';
+      document.querySelector('[data-tab="list"]').click();
+    } else {
+      await API.createRecord ? API.req('POST','tables/quizzes',data) : API.req('POST','tables/quizzes',data);
+      showToast('✅ 문제가 추가됐습니다!', 'success');
+    }
+    resetForm();
+    await loadAll();
+  } catch(e) {
+    showToast('저장 실패. 다시 시도해주세요.', 'error');
+  }
+  hideLoading();
+});
+
+function resetForm() {
+  document.getElementById('fQuestion').value = '';
+  document.getElementById('fA').value = '';
+  document.getElementById('fB').value = '';
+  document.getElementById('fC').value = '';
+  document.getElementById('fD').value = '';
+  document.getElementById('fType').value = 'multiple';
+  document.getElementById('fDiff').value = 'medium';
+  document.getElementById('optionsSection').style.display = 'block';
+  currentAnswerSel = 'A';
+  renderAnswerBtns('multiple', 'A', 'answerBtns');
+}
+document.getElementById('resetFormBtn').addEventListener('click', resetForm);
+document.getElementById('cancelEditBtn').addEventListener('click', () => {
+  editingId = null;
+  resetForm();
+  document.getElementById('formTitle').textContent = '➕ 새 문제 추가';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  document.getElementById('saveQuizBtn').textContent = '💾 저장하기';
+  document.querySelector('[data-tab="list"]').click();
+});
+
+/* ══════════════════ 수정 모달 ══════════════════ */
+function openEditModal(id) {
+  const q = allQuizzes.find(x => x.id === id);
+  if (!q) return;
+  editingId = id;
+
+  // 탭 전환 후 폼에 값 채우기
+  document.querySelector('[data-tab="add"]').click();
+  document.getElementById('formTitle').textContent = '✏️ 문제 수정';
+  document.getElementById('cancelEditBtn').style.display = 'inline-flex';
+  document.getElementById('saveQuizBtn').textContent = '💾 수정 저장';
+
+  document.getElementById('fCat').value = q.category;
+  document.getElementById('fType').value = q.type;
+  document.getElementById('fDiff').value = q.difficulty;
+  document.getElementById('fQuestion').value = q.question;
+
+  const isOX = q.type === 'ox';
+  document.getElementById('optionsSection').style.display = isOX ? 'none' : 'block';
+  if (!isOX) {
+    document.getElementById('fA').value = q.option_a || '';
+    document.getElementById('fB').value = q.option_b || '';
+    document.getElementById('fC').value = q.option_c || '';
+    document.getElementById('fD').value = q.option_d || '';
+  }
+  currentAnswerSel = q.answer;
+  renderAnswerBtns(q.type, q.answer, 'answerBtns');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ══════════════════ 삭제 모달 ══════════════════ */
+function openDeleteModal(id) {
+  const q = allQuizzes.find(x => x.id === id);
+  if (!q) return;
+  deleteTargetId = id;
+  document.getElementById('deleteQuestionText').textContent = q.question;
+  document.getElementById('deleteModal').style.display = 'flex';
+}
+document.getElementById('cancelDeleteBtn').addEventListener('click', () => {
+  document.getElementById('deleteModal').style.display = 'none';
+  deleteTargetId = null;
+});
+document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+  if (!deleteTargetId) return;
+  showLoading();
+  try {
+    await API.req('DELETE', `tables/quizzes/${deleteTargetId}`);
+    document.getElementById('deleteModal').style.display = 'none';
+    showToast('🗑️ 문제가 삭제됐습니다.', 'success');
+    await loadAll();
+  } catch(e) {
+    showToast('삭제 실패.', 'error');
+  }
+  hideLoading();
+  deleteTargetId = null;
+});
+
+/* ══ 구 프롬프트 빌드 로직 제거됨 — DOMContentLoaded에서 신규 로직 사용 ══ */
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); showToast('📋 복사됐어요!', 'success'); } catch(e) {}
+  document.body.removeChild(ta);
+}
+
+/* ══════════════════ JSON 임포트 ══════════════════ */
+document.getElementById('validateBtn').addEventListener('click', () => {
+  const raw = document.getElementById('jsonInput').value.trim();
+  const msg = document.getElementById('validateMsg');
+  const importBtn = document.getElementById('importBtn');
+  pendingImport = [];
+
+  if (!raw) { msg.textContent = '⚠️ JSON을 입력해주세요.'; msg.style.color='var(--warn)'; importBtn.disabled=true; return; }
+
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch(e) {
+    msg.textContent = '❌ JSON 형식이 올바르지 않습니다. AI에게 다시 요청해보세요.';
+    msg.style.color = 'var(--warn)'; importBtn.disabled = true;
+    document.getElementById('previewTable').innerHTML = '';
+    return;
+  }
+
+  if (!Array.isArray(parsed)) { msg.textContent = '❌ 배열([]) 형식이어야 합니다.'; msg.style.color='var(--warn)'; importBtn.disabled=true; return; }
+
+  const errors = [];
+  const valid = [];
+  const VALID_TYPES = ['multiple','ox','expression','translate','vocab'];
+  parsed.forEach((item, i) => {
+    if (!item.question) { errors.push(`#${i+1}: question 없음`); return; }
+    if (!VALID_TYPES.includes(item.type)) { errors.push(`#${i+1}: type 오류 (${item.type})`); return; }
+    if (!item.answer) { errors.push(`#${i+1}: answer 없음`); return; }
+    if (!CATS.includes(item.category)) { errors.push(`#${i+1}: category 오류 (${item.category})`); return; }
+    valid.push(item);
+  });
+
+  if (errors.length > 0) {
+    msg.innerHTML = `⚠️ ${errors.length}개 오류: ${errors.slice(0,3).join(' / ')}`;
+    msg.style.color = 'var(--yellow)';
+  }
+
+  if (valid.length === 0) { importBtn.disabled = true; document.getElementById('previewTable').innerHTML=''; return; }
+
+  pendingImport = valid;
+  msg.innerHTML = (errors.length === 0 ? '✅' : '⚠️') + ` ${valid.length}개 유효 문제 확인됨`;
+  msg.style.color = errors.length === 0 ? 'var(--accent)' : 'var(--yellow)';
+  importBtn.disabled = false;
+
+  // 미리보기
+  document.getElementById('previewTable').innerHTML = `
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">미리보기 (${valid.length}개)</div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>#</th><th>문제</th><th>카테고리</th><th>유형</th><th>정답</th><th>난이도</th></tr></thead>
+      <tbody>${valid.slice(0,10).map((q,i)=>`
+        <tr>
+          <td class="text-muted text-sm">${i+1}</td>
+          <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${q.question}</td>
+          <td><span class="badge badge-primary" style="font-size:11px">${q.category}</span></td>
+          <td><span class="badge ${q.type==='ox'?'badge-accent':'badge-primary'}">${q.type==='ox'?'OX':'4지선다'}</span></td>
+          <td style="font-weight:900;color:var(--accent)">${q.answer}</td>
+          <td><span class="badge ${q.difficulty==='easy'?'badge-accent':q.difficulty==='hard'?'badge-warn':'badge-yellow'}">${DIFF_LABELS[q.difficulty]||q.difficulty}</span></td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>
+    ${valid.length > 10 ? `<div class="text-muted text-sm" style="margin-top:6px">... 외 ${valid.length-10}개</div>` : ''}`;
+});
+
+document.getElementById('importBtn').addEventListener('click', async () => {
+  if (pendingImport.length === 0) return;
+  showLoading();
+  let success = 0, fail = 0;
+  for (const item of pendingImport) {
+    try {
+      await API.req('POST', 'tables/quizzes', {
+        id: Auth.uuid(),
+        category: item.category,
+        type: item.type,
+        question: item.question,
+        option_a: item.option_a || (item.type==='ox'?'O':null),
+        option_b: item.option_b || (item.type==='ox'?'X':null),
+        option_c: item.option_c || null,
+        option_d: item.option_d || null,
+        answer: item.answer,
+        difficulty: item.difficulty || 'medium'
+      });
+      success++;
+    } catch(e) { fail++; }
+  }
+  hideLoading();
+  showToast(`✅ ${success}개 추가 완료${fail>0?' / '+fail+'개 실패':''}`, 'success');
+  document.getElementById('jsonInput').value = '';
+  document.getElementById('previewTable').innerHTML = '';
+  document.getElementById('validateMsg').textContent = '';
+  document.getElementById('importBtn').disabled = true;
+  pendingImport = [];
+  await loadAll();
+  document.querySelector('[data-tab="list"]').click();
+});
+
+/* ══════════════════ 초기 로드 ══════════════════ */
+loadAll();
+</script>
+</body>
+</html>

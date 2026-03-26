@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>퀴즈퀴즈 — 실시간 멀티플레이 퀴즈</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.auth-wrap {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.auth-logo {
+  font-size: 42px; font-weight: 900; margin-bottom: 6px;
+  background: linear-gradient(135deg, #9d97ff, #43e97b);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.auth-tagline { color: var(--muted); font-size: 14px; margin-bottom: 36px; }
+
+.auth-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 32px;
+  width: 100%; max-width: 400px;
+}
+.auth-tabs {
+  display: flex; gap: 0;
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+.auth-tab {
+  flex: 1; padding: 9px;
+  border: none; border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+}
+.auth-tab.active { background: var(--primary); color: #fff; }
+
+.auth-form { display: none; }
+.auth-form.active { display: block; }
+
+.error-msg {
+  background: rgba(255,101,132,.12);
+  border: 1px solid rgba(255,101,132,.3);
+  border-radius: 8px;
+  color: var(--warn);
+  font-size: 13px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  display: none;
+}
+.error-msg.show { display: block; }
+
+/* 랜딩 히어로 */
+.hero-features {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 32px;
+}
+.hero-feat {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px; font-weight: 600;
+  color: var(--muted);
+  display: flex; align-items: center; gap: 6px;
+}
+</style>
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-logo">🎯 퀴즈퀴즈</div>
+  <div class="auth-tagline">실시간 멀티플레이 지식 대결</div>
+
+  <div class="hero-features">
+    <div class="hero-feat">⚔️ 실시간 1:1 대결</div>
+    <div class="hero-feat">👥 최대 8인 배틀</div>
+    <div class="hero-feat">📚 5개 카테고리</div>
+    <div class="hero-feat">🏆 전체 랭킹</div>
+  </div>
+
+  <div class="auth-box">
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">로그인</button>
+      <button class="auth-tab" data-tab="register">회원가입</button>
+    </div>
+
+    <!-- 로그인 폼 -->
+    <div class="auth-form active" id="loginForm">
+      <div class="error-msg" id="loginError"></div>
+      <form autocomplete="on" onsubmit="doLogin(); return false;">
+      <div class="input-group">
+        <label>이메일</label>
+        <input class="input-field" type="email" id="loginEmail" placeholder="example@email.com" autocomplete="email">
+      </div>
+      <div class="input-group">
+        <label>비밀번호</label>
+        <input class="input-field" type="password" id="loginPw" placeholder="비밀번호 입력" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn">로그인</button>
+      </form>
+    </div>
+
+    <!-- 회원가입 폼 -->
+    <div class="auth-form" id="registerForm">
+      <div class="error-msg" id="regError"></div>
+      <form autocomplete="on" onsubmit="doRegister(); return false;">
+      <div class="input-group">
+        <label>닉네임 (2~12자)</label>
+        <input class="input-field" type="text" id="regNick" placeholder="퀴즈왕123" maxlength="12" autocomplete="nickname">
+      </div>
+      <div class="input-group">
+        <label>이메일</label>
+        <input class="input-field" type="email" id="regEmail" placeholder="example@email.com" autocomplete="email">
+      </div>
+      <div class="input-group">
+        <label>비밀번호 (8자 이상)</label>
+        <input class="input-field" type="password" id="regPw" placeholder="비밀번호 입력" autocomplete="new-password">
+      </div>
+      <div class="input-group">
+        <label>비밀번호 확인</label>
+        <input class="input-field" type="password" id="regPw2" placeholder="비밀번호 재입력" autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn btn-accent btn-full btn-lg" id="registerBtn">회원가입</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="mt-16 text-sm text-muted">
+    계속하면 서비스 이용약관에 동의하는 것으로 간주합니다.
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/utils.js"></script>
+<script>
+// 이미 로그인 시 로비로
+if (Auth.isLoggedIn()) window.location.href = 'lobby.html';
+
+// 탭 전환
+document.querySelectorAll('.auth-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById(this.dataset.tab + 'Form').classList.add('active');
+  });
+});
+
+// 로그인 버튼 (form onsubmit이 주 처리, 버튼 클릭도 지원)
+document.getElementById('loginBtn').addEventListener('click', function(e) {
+  // form submit이 이미 처리하므로 type=submit 아닌 경우에만
+  if (this.type !== 'submit') doLogin();
+});
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pw    = document.getElementById('loginPw').value;
+  const errEl = document.getElementById('loginError');
+  errEl.classList.remove('show');
+
+  if (!email || !pw) { errEl.textContent = '이메일과 비밀번호를 입력해주세요.'; errEl.classList.add('show'); return; }
+
+  // 버튼 비활성화 (중복 클릭 방지)
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = '로그인 중...';
+
+  showLoading();
+  try {
+    const res = await API.getUsers(email);
+    const users = res.data || [];
+    const user = users.find(u => u.email === email);
+    if (!user) {
+      errEl.textContent = '존재하지 않는 이메일입니다.';
+      errEl.classList.add('show');
+      hideLoading(); btn.disabled = false; btn.textContent = '로그인';
+      return;
+    }
+    if (user.password_hash !== Auth.hash(pw)) {
+      errEl.textContent = '비밀번호가 올바르지 않습니다.';
+      errEl.classList.add('show');
+      hideLoading(); btn.disabled = false; btn.textContent = '로그인';
+      return;
+    }
+    Auth.set(user);
+    window.location.href = 'lobby.html';
+  } catch (e) {
+    console.error('로그인 오류:', e);
+    errEl.textContent = `오류: ${e.message || '잠시 후 다시 시도해주세요.'}`;
+    errEl.classList.add('show');
+    btn.disabled = false;
+    btn.textContent = '로그인';
+  }
+  hideLoading();
+}
+
+// 회원가입
+document.getElementById('registerBtn').addEventListener('click', doRegister);
+
+async function doRegister() {
+  const nick  = document.getElementById('regNick').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pw    = document.getElementById('regPw').value;
+  const pw2   = document.getElementById('regPw2').value;
+  const errEl = document.getElementById('regError');
+  errEl.classList.remove('show');
+
+  if (!nick || !email || !pw || !pw2) { errEl.textContent = '모든 항목을 입력해주세요.'; errEl.classList.add('show'); return; }
+  if (nick.length < 2) { errEl.textContent = '닉네임은 2자 이상이어야 합니다.'; errEl.classList.add('show'); return; }
+  if (pw.length < 8) { errEl.textContent = '비밀번호는 8자 이상이어야 합니다.'; errEl.classList.add('show'); return; }
+  if (pw !== pw2) { errEl.textContent = '비밀번호가 일치하지 않습니다.'; errEl.classList.add('show'); return; }
+
+  const regBtn = document.getElementById('registerBtn');
+  regBtn.disabled = true;
+  regBtn.textContent = '가입 중...';
+
+  showLoading();
+  try {
+    // 중복 확인
+    const res = await API.getUsers(email);
+    const users = res.data || [];
+    if (users.find(u => u.email === email)) {
+      errEl.textContent = '이미 사용 중인 이메일입니다.';
+      errEl.classList.add('show');
+      hideLoading(); regBtn.disabled = false; regBtn.textContent = '회원가입';
+      return;
+    }
+    if (users.find(u => u.nickname === nick)) {
+      errEl.textContent = '이미 사용 중인 닉네임입니다.';
+      errEl.classList.add('show');
+      hideLoading(); regBtn.disabled = false; regBtn.textContent = '회원가입';
+      return;
+    }
+
+    const newUser = {
+      id: Auth.uuid(),
+      email, nickname: nick,
+      password_hash: Auth.hash(pw),
+      level: 1, xp: 0, total_games: 0, wins: 0
+    };
+    const created = await API.createUser(newUser);
+    Auth.set(created);
+    showToast('🎉 회원가입 완료!', 'success');
+    setTimeout(() => window.location.href = 'lobby.html', 800);
+  } catch (e) {
+    console.error('회원가입 오류:', e);
+    errEl.textContent = `오류: ${e.message || '잠시 후 다시 시도해주세요.'}`;
+    errEl.classList.add('show');
+    regBtn.disabled = false;
+    regBtn.textContent = '회원가입';
+  }
+  hideLoading();
+}
+</script>
+</body>
+</html>

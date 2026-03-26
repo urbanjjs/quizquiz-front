@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB 마이그레이션 — GenSpark → Cloudflare D1</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0e0e16; color: #e2e2f0;
+  font-family: 'Segoe UI', sans-serif;
+  min-height: 100vh; padding: 32px 16px;
+}
+.wrap { max-width: 720px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 900; margin-bottom: 6px; }
+.sub { color: #888; font-size: 13px; margin-bottom: 28px; }
+
+.card {
+  background: #1a1a2e;
+  border: 1px solid #2a2a50;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card h3 { font-size: 15px; font-weight: 800; margin-bottom: 14px; }
+
+label { font-size: 12px; color: #888; display: block; margin-bottom: 6px; }
+input {
+  width: 100%; background: #0e0e16;
+  border: 1.5px solid #2a2a50;
+  border-radius: 8px; padding: 10px 14px;
+  color: #e2e2f0; font-size: 13px;
+  font-family: monospace;
+  margin-bottom: 14px;
+  outline: none;
+}
+input:focus { border-color: #6c63ff; }
+
+.btn {
+  padding: 12px 24px; border-radius: 10px;
+  border: none; cursor: pointer;
+  font-size: 14px; font-weight: 800;
+  font-family: inherit;
+  transition: all .2s;
+}
+.btn-primary { background: #6c63ff; color: #fff; width: 100%; padding: 14px; font-size: 15px; }
+.btn-primary:hover { background: #5a52e0; }
+.btn-primary:disabled { background: #3a3a60; cursor: not-allowed; }
+
+/* 진행 상황 */
+.progress-wrap { display: none; }
+.progress-bar-bg {
+  height: 10px; background: #2a2a50;
+  border-radius: 99px; overflow: hidden;
+  margin-bottom: 10px;
+}
+.progress-bar-fill {
+  height: 100%; background: linear-gradient(90deg, #6c63ff, #43e97b);
+  border-radius: 99px;
+  transition: width .3s;
+  width: 0%;
+}
+.progress-text { font-size: 13px; color: #888; margin-bottom: 16px; }
+
+/* 로그 */
+.log-box {
+  background: #0a0a14;
+  border: 1px solid #2a2a50;
+  border-radius: 10px;
+  padding: 14px;
+  height: 320px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.log-info    { color: #888; }
+.log-success { color: #43e97b; }
+.log-error   { color: #ff6584; }
+.log-warn    { color: #f59e0b; }
+.log-header  { color: #6c63ff; font-weight: 800; }
+
+/* 결과 */
+.result-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr));
+  gap: 10px; margin-top: 16px;
+}
+.res-box {
+  background: #0e0e16; border: 1px solid #2a2a50;
+  border-radius: 10px; padding: 14px; text-align: center;
+}
+.res-box .val { font-size: 24px; font-weight: 900; color: #6c63ff; }
+.res-box .lbl { font-size: 11px; color: #888; margin-top: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🚀 DB 마이그레이션</h1>
+  <div class="sub">GenSpark Table API → Cloudflare D1 자동 이전</div>
+
+  <!-- 설정 -->
+  <div class="card">
+    <h3>⚙️ 설정</h3>
+
+    <label>GenSpark API Base URL (현재 사이트 주소)</label>
+    <input id="genspark_url" value="" placeholder="https://your-project.genspark.site">
+
+    <label>Cloudflare Worker URL</label>
+    <input id="cf_url" value="https://quizquiz-worker.urbanjjs.workers.dev">
+
+    <label>이전할 테이블 선택</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:6px;color:#e2e2f0;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="chk_users" checked style="width:auto;margin:0"> 👤 users
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;color:#e2e2f0;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="chk_quizzes" checked style="width:auto;margin:0"> 📚 quizzes
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;color:#e2e2f0;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="chk_rooms" style="width:auto;margin:0"> 🏠 rooms
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;color:#e2e2f0;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="chk_records" style="width:auto;margin:0"> 🎮 game_records
+      </label>
+    </div>
+
+    <button class="btn btn-primary" id="startBtn" onclick="startMigration()">
+      ⚡ 마이그레이션 시작
+    </button>
+  </div>
+
+  <!-- 진행 상황 -->
+  <div class="card progress-wrap" id="progressWrap">
+    <h3>📊 진행 상황</h3>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-text" id="progressText">준비 중...</div>
+
+    <div class="result-grid" id="resultGrid"></div>
+
+    <div class="log-box" id="logBox"></div>
+  </div>
+</div>
+
+<script>
+const stats = { users: 0, quizzes: 0, rooms: 0, records: 0, errors: 0 };
+
+function log(msg, type = 'info') {
+  const box = document.getElementById('logBox');
+  const line = document.createElement('div');
+  line.className = `log-${type}`;
+  const time = new Date().toLocaleTimeString();
+  line.textContent = `[${time}] ${msg}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function setProgress(pct, text) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = text;
+}
+
+function updateResultGrid() {
+  document.getElementById('resultGrid').innerHTML = `
+    <div class="res-box"><div class="val" style="color:#43e97b">${stats.users}</div><div class="lbl">👤 users</div></div>
+    <div class="res-box"><div class="val" style="color:#6c63ff">${stats.quizzes}</div><div class="lbl">📚 quizzes</div></div>
+    <div class="res-box"><div class="val" style="color:#f59e0b">${stats.rooms}</div><div class="lbl">🏠 rooms</div></div>
+    <div class="res-box"><div class="val" style="color:#7ec8ff">${stats.records}</div><div class="lbl">🎮 records</div></div>
+    <div class="res-box"><div class="val" style="color:#ff6584">${stats.errors}</div><div class="lbl">❌ errors</div></div>
+  `;
+}
+
+async function fetchAll(baseUrl, table) {
+  const res = await fetch(`${baseUrl}/tables/${table}?limit=500`);
+  if (!res.ok) throw new Error(`GenSpark ${table} 읽기 실패: ${res.status}`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+async function pushOne(cfUrl, endpoint, item) {
+  const res = await fetch(`${cfUrl}${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(item)
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt);
+  }
+  return res.json();
+}
+
+async function migrateTable(gsUrl, cfUrl, table, endpoint, labelFn) {
+  log(`━━━ ${table} 이전 시작 ━━━`, 'header');
+  let items;
+  try {
+    items = await fetchAll(gsUrl, table);
+    log(`GenSpark에서 ${items.length}개 읽기 완료`, 'success');
+  } catch(e) {
+    log(`읽기 실패: ${e.message}`, 'error');
+    stats.errors++;
+    return;
+  }
+
+  let ok = 0, fail = 0;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    // 시스템 필드 제거
+    const { gs_project_id, gs_table_name, deleted, ...clean } = item;
+    if (deleted) { log(`스킵 (삭제됨): ${clean.id}`, 'warn'); continue; }
+
+    try {
+      await pushOne(cfUrl, endpoint, clean);
+      ok++;
+      if (ok % 10 === 0) log(`${ok}/${items.length} 완료`, 'info');
+    } catch(e) {
+      fail++;
+      stats.errors++;
+      log(`실패 [${clean.id}]: ${e.message}`, 'error');
+    }
+
+    // 과부하 방지 딜레이
+    await new Promise(r => setTimeout(r, 80));
+  }
+
+  log(`${table} 완료 ✅ 성공:${ok} 실패:${fail}`, 'success');
+  return ok;
+}
+
+async function startMigration() {
+  const gsUrl  = document.getElementById('genspark_url').value.trim().replace(/\/$/, '');
+  const cfUrl  = document.getElementById('cf_url').value.trim().replace(/\/$/, '');
+
+  if (!gsUrl) {
+    alert('GenSpark URL을 입력해주세요!\n\n배포된 사이트 주소를 입력하세요.\n예: https://xxx.genspark.site');
+    return;
+  }
+
+  const doUsers   = document.getElementById('chk_users').checked;
+  const doQuizzes = document.getElementById('chk_quizzes').checked;
+  const doRooms   = document.getElementById('chk_rooms').checked;
+  const doRecords = document.getElementById('chk_records').checked;
+
+  // UI 초기화
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('logBox').innerHTML = '';
+  Object.keys(stats).forEach(k => stats[k] = 0);
+
+  log('마이그레이션 시작!', 'header');
+  log(`GenSpark: ${gsUrl}`, 'info');
+  log(`Cloudflare: ${cfUrl}`, 'info');
+
+  const tasks = [];
+  if (doUsers)   tasks.push({ table: 'users',        endpoint: '/api/users',        key: 'users' });
+  if (doQuizzes) tasks.push({ table: 'quizzes',      endpoint: '/api/quizzes',      key: 'quizzes' });
+  if (doRooms)   tasks.push({ table: 'rooms',        endpoint: '/api/rooms',        key: 'rooms' });
+  if (doRecords) tasks.push({ table: 'game_records', endpoint: '/api/game_records', key: 'records' });
+
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i];
+    setProgress(
+      Math.round((i / tasks.length) * 100),
+      `${t.table} 이전 중... (${i+1}/${tasks.length})`
+    );
+    const cnt = await migrateTable(gsUrl, cfUrl, t.table, t.endpoint);
+    if (cnt) stats[t.key] = cnt;
+    updateResultGrid();
+  }
+
+  setProgress(100, '✅ 마이그레이션 완료!');
+  log('━━━ 전체 완료 ━━━', 'header');
+  log(`users: ${stats.users} / quizzes: ${stats.quizzes} / rooms: ${stats.rooms} / records: ${stats.records} / errors: ${stats.errors}`, 'success');
+
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('startBtn').textContent = '🔄 다시 실행';
+}
+</script>
+</body>
+</html>

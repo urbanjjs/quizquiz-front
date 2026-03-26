@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>대기방 — 퀴즈퀴즈</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.room-wrap {
+  max-width: 680px; margin: 0 auto; padding: 32px 20px 80px;
+}
+.room-header {
+  background: linear-gradient(135deg, #1a1845, #1a2540);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 20px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap;
+}
+.room-header-info h2 { font-size: 20px; font-weight: 900; margin-bottom: 6px; }
+.room-header-info .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.room-header-info .meta span { display: flex; align-items: center; gap: 4px; }
+
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.player-slot {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 14px;
+  text-align: center;
+  transition: border-color .2s;
+}
+.player-slot.filled { border-color: var(--primary); }
+.player-slot.ready  { border-color: var(--accent); }
+.player-slot.me     { border-color: var(--yellow); }
+.player-slot.empty  { opacity: .4; }
+.player-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-l));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 700; color: #fff;
+  margin: 0 auto 10px;
+}
+.player-slot.host .player-avatar::after {
+  content: '👑'; position: absolute; margin-top:-36px; margin-left:28px; font-size:14px;
+}
+.player-slot.host .player-avatar { position: relative; }
+.player-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-badge { font-size: 11px; }
+
+.room-actions { display: flex; gap: 10px; }
+.room-actions .btn { flex: 1; }
+
+.chat-notice {
+  background: rgba(108,99,255,.08);
+  border: 1px solid rgba(108,99,255,.2);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 13px; color: var(--muted);
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+/* 카운트다운 오버레이 */
+#countdownOverlay {
+  position: fixed; inset: 0;
+  background: rgba(10,10,25,.92);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 999; display: none;
+}
+#countdownNum {
+  font-size: 120px; font-weight: 900;
+  background: linear-gradient(135deg, var(--primary-l), var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: pulse .9s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+#countdownText { color: var(--muted); font-size: 18px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="topbar" id="topbar"></div>
+
+<div class="room-wrap">
+  <div id="roomContent">
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<div id="countdownOverlay">
+  <div id="countdownNum">3</div>
+  <div id="countdownText">게임 시작!</div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const user = Auth.require();
+if (!user) throw new Error('not logged in');
+renderTopbar(user);
+
+const params = new URLSearchParams(location.search);
+const roomId = params.get('id');
+if (!roomId) { window.location.href = 'lobby.html'; throw new Error('no room id'); }
+
+let room = null;
+let pollTimer = null;
+let isLeaving = false;
+
+const CATS = { '일반상식':'🌍','역사사회':'📜','과학IT':'🔬','언어영어':'🔤','시사뉴스':'📰' };
+
+// ── 방 정보 렌더 ──
+function renderRoom(r) {
+  room = r;
+  const players = JSON.parse(r.players_json || '[]');
+  const isHost = r.host_id === user.id;
+  const me = players.find(p => p.id === user.id);
+  const allReady = players.length > 1 && players.filter(p => p.id !== r.host_id).every(p => p.ready);
+  const catIcon = CATS[r.category] || '🎯';
+
+  // 플레이어 슬롯
+  const slots = [];
+  for (let i = 0; i < r.max_players; i++) {
+    const p = players[i];
+    if (p) {
+      const isMe = p.id === user.id;
+      const isHostP = p.id === r.host_id;
+      let cls = 'player-slot filled';
+      if (p.ready || isHostP) cls += ' ready';
+      if (isMe) cls += ' me';
+      if (isHostP) cls += ' host';
+      slots.push(`
+        <div class="${cls}">
+          <div class="player-avatar">${p.nickname[0].toUpperCase()}</div>
+          <div class="player-name">${p.nickname}</div>
+          <div class="player-badge">
+            ${isHostP ? '<span class="badge badge-yellow">👑 방장</span>' :
+              p.ready ? '<span class="badge badge-accent">✅ 준비</span>' :
+              '<span class="badge" style="background:rgba(255,255,255,.07);color:var(--muted)">대기중</span>'}
+            ${isMe ? ' <span class="badge badge-primary">나</span>' : ''}
+          </div>
+        </div>`);
+    } else {
+      slots.push(`<div class="player-slot empty"><div class="player-avatar" style="background:var(--border)">+</div><div class="player-name text-muted">대기중...</div></div>`);
+    }
+  }
+
+  // 버튼
+  let actionBtns = '';
+  if (isHost) {
+    const canStart = players.length >= 2 && allReady;
+    actionBtns = `
+      <button class="btn btn-accent btn-lg" id="startBtn" ${canStart ? '' : 'disabled'}>
+        ${canStart ? '🎮 게임 시작!' : '참여자 준비 대기중...'}
+      </button>
+      <button class="btn btn-danger" id="leaveBtn">나가기</button>`;
+  } else {
+    const myReady = me && me.ready;
+    actionBtns = `
+      <button class="btn ${myReady ? 'btn-ghost' : 'btn-accent'} btn-lg" id="readyBtn">
+        ${myReady ? '✅ 준비 완료 (취소)' : '준비하기'}
+      </button>
+      <button class="btn btn-danger" id="leaveBtn">나가기</button>`;
+  }
+
+  document.getElementById('roomContent').innerHTML = `
+    <div class="room-header">
+      <div class="room-header-info">
+        <h2>${catIcon} ${r.name || '이름없는 방'}</h2>
+        <div class="meta">
+          <span>👤 방장: ${r.host_nickname}</span>
+          <span>📂 ${r.category}</span>
+          <span>📝 ${r.question_count}문제</span>
+          <span>👥 ${players.length}/${r.max_players}명</span>
+        </div>
+      </div>
+      <span class="badge ${r.status==='playing'?'badge-warn':'badge-accent'}" style="font-size:12px;padding:5px 12px">
+        ${r.status==='playing'?'진행중':'대기중'}
+      </span>
+    </div>
+
+    <div class="section-title">👥 플레이어</div>
+    <div class="players-grid">${slots.join('')}</div>
+
+    <div class="chat-notice">
+      ${isHost
+        ? allReady
+          ? '✅ 모든 플레이어 준비 완료! 게임을 시작할 수 있습니다.'
+          : players.length < 2
+            ? '⏳ 다른 플레이어가 입장하길 기다리는 중...'
+            : '⏳ 모든 플레이어가 준비를 완료하면 시작 버튼이 활성화됩니다.'
+        : me && me.ready
+          ? '✅ 준비 완료! 방장이 게임을 시작하길 기다리는 중...'
+          : '👆 준비하기 버튼을 눌러주세요!'}
+    </div>
+
+    <div class="room-actions">${actionBtns}</div>`;
+
+  // 이벤트 바인딩
+  document.getElementById('leaveBtn').addEventListener('click', leaveRoom);
+
+  if (isHost) {
+    const startBtn = document.getElementById('startBtn');
+    if (startBtn && !startBtn.disabled) {
+      startBtn.addEventListener('click', startGame);
+    }
+  } else {
+    const readyBtn = document.getElementById('readyBtn');
+    if (readyBtn) readyBtn.addEventListener('click', toggleReady);
+  }
+}
+
+// ── 준비 토글 ──
+async function toggleReady() {
+  try {
+    const r = await API.getRoomById(roomId);
+    const players = JSON.parse(r.players_json || '[]');
+    const me = players.find(p => p.id === user.id);
+    if (!me) return;
+    me.ready = !me.ready;
+    await API.updateRoom(roomId, { players_json: JSON.stringify(players) });
+    renderRoom({ ...r, players_json: JSON.stringify(players) });
+  } catch(e) { showToast('오류 발생', 'error'); }
+}
+
+// ── 게임 시작 ──
+async function startGame() {
+  try {
+    showLoading();
+    const r = await API.getRoomById(roomId);
+    const players = JSON.parse(r.players_json || '[]');
+    // 점수 초기화
+    players.forEach(p => p.score = 0);
+    const gameState = { questionIndex: 0, phase: 'playing', startedAt: Date.now() };
+    await API.updateRoom(roomId, {
+      status: 'playing',
+      players_json: JSON.stringify(players),
+      game_state_json: JSON.stringify(gameState)
+    });
+    clearInterval(pollTimer);
+    hideLoading();
+    startCountdown();
+  } catch(e) { showToast('시작 실패', 'error'); hideLoading(); }
+}
+
+// ── 나가기 ──
+async function leaveRoom() {
+  if (isLeaving) return;
+  isLeaving = true;
+  clearInterval(pollTimer);
+  try {
+    const r = await API.getRoomById(roomId);
+    const players = JSON.parse(r.players_json || '[]');
+    const filtered = players.filter(p => p.id !== user.id);
+    if (filtered.length === 0) {
+      await API.deleteRoom(roomId);
+    } else {
+      const newHostId = r.host_id === user.id ? filtered[0].id : r.host_id;
+      const newHostNick = r.host_id === user.id ? filtered[0].nickname : r.host_nickname;
+      await API.updateRoom(roomId, {
+        host_id: newHostId, host_nickname: newHostNick,
+        current_players: filtered.length,
+        players_json: JSON.stringify(filtered)
+      });
+    }
+  } catch(e) {}
+  window.location.href = 'lobby.html';
+}
+
+// ── 카운트다운 ──
+function startCountdown() {
+  const overlay = document.getElementById('countdownOverlay');
+  const numEl = document.getElementById('countdownNum');
+  overlay.style.display = 'flex';
+  let n = 3;
+  numEl.textContent = n;
+  const timer = setInterval(() => {
+    n--;
+    if (n <= 0) {
+      clearInterval(timer);
+      overlay.style.display = 'none';
+      window.location.href = `game.html?id=${roomId}`;
+    } else {
+      numEl.textContent = n;
+    }
+  }, 1000);
+}
+
+// ── 폴링 ──
+async function pollRoom() {
+  try {
+    const r = await API.getRoomById(roomId);
+    if (!r) { clearInterval(pollTimer); window.location.href = 'lobby.html'; return; }
+
+    // 게임 시작 감지 (방장 아닌 경우)
+    if (r.status === 'playing' && room && room.status === 'waiting') {
+      clearInterval(pollTimer);
+      startCountdown();
+      return;
+    }
+    renderRoom(r);
+  } catch(e) {}
+}
+
+// ── 초기 로드 ──
+(async () => {
+  showLoading();
+  try {
+    const r = await API.getRoomById(roomId);
+    if (!r) { window.location.href = 'lobby.html'; return; }
+    // 이미 진행 중이면 게임으로
+    if (r.status === 'playing') {
+      const players = JSON.parse(r.players_json || '[]');
+      if (players.find(p => p.id === user.id)) {
+        window.location.href = `game.html?id=${roomId}`; return;
+      }
+    }
+    renderRoom(r);
+    pollTimer = setInterval(pollRoom, 2000);
+  } catch(e) {
+    showToast('방 정보를 불러올 수 없습니다.', 'error');
+    setTimeout(() => window.location.href = 'lobby.html', 1500);
+  }
+  hideLoading();
+})();
+
+// 페이지 떠날 때 방에서 나가기
+window.addEventListener('beforeunload', () => {
+  clearInterval(pollTimer);
+});
+</script>
+</body>
+</html>

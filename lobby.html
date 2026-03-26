@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로비 — 퀴즈퀴즈</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.lobby-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+@media(max-width:720px){ .lobby-grid { grid-template-columns: 1fr; } }
+
+/* 빠른 매칭 배너 */
+.quick-banner {
+  background: linear-gradient(135deg, #1a1845, #1a2540);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px 24px;
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.quick-banner h3 { font-size: 16px; font-weight: 900; margin-bottom: 4px; }
+.quick-banner p  { font-size: 13px; color: var(--muted); }
+.quick-banner .btn { margin-left: auto; flex-shrink: 0; }
+.btn-solo    { background: linear-gradient(135deg, #9b59b6, #6c63ff); color: #fff; }
+.btn-english { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: #fff; }
+
+/* 방 목록 */
+.room-list { display: flex; flex-direction: column; gap: 10px; }
+.room-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex; align-items: center; gap: 14px;
+  cursor: pointer;
+  transition: border-color .15s, transform .15s;
+}
+.room-card:hover { border-color: var(--primary-l); transform: translateX(3px); }
+.room-card.playing { opacity: .6; cursor: not-allowed; }
+.room-card.playing:hover { transform: none; border-color: var(--border); }
+.room-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-l));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.room-info { flex: 1; min-width: 0; }
+.room-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-meta { font-size: 12px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+.room-meta span { display: flex; align-items: center; gap: 3px; }
+.room-right { text-align: right; flex-shrink: 0; }
+.room-players { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.room-status { font-size: 11px; }
+
+/* 필터 */
+.filter-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 16px; align-items: center;
+}
+.filter-btn {
+  padding: 6px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.filter-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.filter-btn:hover:not(.active) { border-color: var(--primary-l); color: var(--text); }
+
+/* 오른쪽 사이드 */
+.side-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+.side-card-title { font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: .5px; }
+.my-stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.my-stat-row:last-child { margin-bottom: 0; }
+.my-stat-label { font-size: 13px; color: var(--muted); }
+.my-stat-val { font-size: 14px; font-weight: 700; }
+
+/* 랭킹 미니 */
+.rank-mini-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.rank-mini-item:last-child { border-bottom: none; padding-bottom: 0; }
+.rank-num { width: 20px; text-align: center; font-weight: 700; color: var(--muted); font-size: 12px; }
+.rank-num.gold   { color: var(--yellow); }
+.rank-num.silver { color: #b0b0c8; }
+.rank-num.bronze { color: #cd7f32; }
+
+/* XP 바 */
+.xp-bar-wrap { margin-top: 8px; }
+.xp-bar-info { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.xp-bar-bg { background: var(--border); border-radius: 99px; height: 6px; }
+.xp-bar-fill { height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width .5s; }
+
+/* 모달 */
+.cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.cat-btn {
+  padding: 12px; border: 1.5px solid var(--border);
+  border-radius: 10px; background: var(--surface2);
+  color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s; text-align: center;
+}
+.cat-btn.active { border-color: var(--primary); background: rgba(108,99,255,.15); color: var(--primary-l); }
+.cat-btn:hover:not(.active) { border-color: var(--primary-l); }
+
+.num-btns { display: flex; gap: 8px; margin-bottom: 14px; }
+.num-btn {
+  flex: 1; padding: 10px;
+  border: 1.5px solid var(--border); border-radius: 10px;
+  background: var(--surface2); color: var(--muted);
+  font-family: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+}
+.num-btn.active { border-color: var(--accent); background: rgba(67,233,123,.12); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="topbar" id="topbar"></div>
+
+<div class="page">
+  <!-- 빠른 매칭 배너 -->
+  <div class="quick-banner">
+    <div>
+      <h3>⚡ 빠른 매칭</h3>
+      <p>대기 중인 방에 바로 입장합니다</p>
+    </div>
+    <a href="english.html" class="btn btn-english btn-lg">🇺🇸 생활영어</a>
+    <a href="solo.html" class="btn btn-solo btn-lg">🧠 혼자연습</a>
+    <button class="btn btn-accent btn-lg" id="quickMatchBtn">⚡ 빠른 매칭</button>
+    <button class="btn btn-primary btn-lg" id="createRoomBtn">➕ 방 만들기</button>
+  </div>
+
+  <div class="lobby-grid">
+    <!-- 방 목록 -->
+    <div>
+      <div class="section-title">🚪 공개 대기방</div>
+      <div class="filter-row">
+        <span style="font-size:13px;color:var(--muted)">카테고리:</span>
+        <button class="filter-btn active" data-cat="전체">전체</button>
+        <button class="filter-btn" data-cat="일반상식">일반상식</button>
+        <button class="filter-btn" data-cat="역사사회">역사/사회</button>
+        <button class="filter-btn" data-cat="과학IT">과학/IT</button>
+        <button class="filter-btn" data-cat="언어영어">언어/영어</button>
+        <button class="filter-btn" data-cat="시사뉴스">시사/뉴스</button>
+      </div>
+      <div class="room-list" id="roomList">
+        <div class="spinner"></div>
+      </div>
+    </div>
+
+    <!-- 사이드바 -->
+    <div>
+      <!-- 내 정보 -->
+      <div class="side-card" id="myStatCard">
+        <div class="side-card-title">내 정보</div>
+        <div id="myStatContent"><div class="spinner" style="margin:10px auto;width:24px;height:24px;border-width:2px"></div></div>
+      </div>
+
+      <!-- 접속 현황 -->
+      <div class="side-card">
+        <div class="side-card-title">현황</div>
+        <div class="my-stat-row">
+          <span class="my-stat-label">🟢 열린 방</span>
+          <span class="my-stat-val text-accent" id="openRoomsCount">-</span>
+        </div>
+        <div class="my-stat-row">
+          <span class="my-stat-label">🎮 진행 중</span>
+          <span class="my-stat-val text-primary" id="playingRoomsCount">-</span>
+        </div>
+      </div>
+
+      <!-- 미니 랭킹 -->
+      <div class="side-card">
+        <div class="side-card-title" style="display:flex;justify-content:space-between">
+          TOP 랭킹
+          <a href="ranking.html" style="font-size:11px;color:var(--primary-l);text-decoration:none">전체 보기 →</a>
+        </div>
+        <div id="miniRanking"><div class="spinner" style="margin:10px auto;width:24px;height:24px;border-width:2px"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 방 만들기 모달 -->
+<div class="modal-bg" id="createModal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">🚪 방 만들기</div>
+    <div class="input-group">
+      <label>방 이름</label>
+      <input class="input-field" type="text" id="roomName" placeholder="예) 역사왕 도전!" maxlength="30">
+    </div>
+    <div class="input-group">
+      <label>카테고리</label>
+      <div class="cat-grid" id="catGrid">
+        <button class="cat-btn active" data-cat="일반상식">🌍 일반상식</button>
+        <button class="cat-btn" data-cat="역사사회">📜 역사/사회</button>
+        <button class="cat-btn" data-cat="과학IT">🔬 과학/IT</button>
+        <button class="cat-btn" data-cat="언어영어">🔤 언어/영어</button>
+        <button class="cat-btn" data-cat="시사뉴스">📰 시사/뉴스</button>
+      </div>
+    </div>
+    <div class="input-group">
+      <label>최대 인원</label>
+      <div class="num-btns">
+        <button class="num-btn active" data-n="2">2인</button>
+        <button class="num-btn" data-n="4">4인</button>
+        <button class="num-btn" data-n="8">8인</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-full" id="cancelRoomBtn">취소</button>
+      <button class="btn btn-primary btn-full" id="confirmCreateBtn">방 만들기</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const user = Auth.require();
+if (!user) throw new Error('not logged in');
+
+renderTopbar(user);
+
+let allRooms = [];
+let currentCat = '전체';
+let selCat = '일반상식';
+let selMax = 2;
+
+const CATS = { '일반상식':'🌍','역사사회':'📜','과학IT':'🔬','언어영어':'🔤','시사뉴스':'📰' };
+
+// ── 방 목록 로드 ──
+async function loadRooms() {
+  try {
+    const res = await API.getRooms();
+    allRooms = (res.data || []).filter(r => r.status !== 'ended');
+    renderRooms();
+    updateStats();
+  } catch(e) {
+    document.getElementById('roomList').innerHTML = '<div class="empty-state"><p>방 목록을 불러올 수 없습니다.</p></div>';
+  }
+}
+
+function renderRooms() {
+  const list = document.getElementById('roomList');
+  let rooms = allRooms;
+  if (currentCat !== '전체') rooms = rooms.filter(r => r.category === currentCat);
+
+  // 오래된 방 정리 (30분 이상)
+  const now = Date.now();
+  rooms = rooms.filter(r => now - r.created_at < 30 * 60 * 1000);
+
+  if (rooms.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="emo">🏠</div><p>대기 중인 방이 없습니다.<br>첫 번째 방을 만들어보세요!</p></div>`;
+    return;
+  }
+
+  list.innerHTML = rooms.map(r => {
+    const cur = r.current_players || 1;
+    const max = r.max_players || 2;
+    const isFull = cur >= max;
+    const isPlaying = r.status === 'playing';
+    const catIcon = CATS[r.category] || '🎯';
+    const disabled = isFull || isPlaying;
+    return `
+    <div class="room-card ${disabled ? 'playing' : ''}" data-id="${r.id}" data-disabled="${disabled}">
+      <div class="room-icon">${catIcon}</div>
+      <div class="room-info">
+        <div class="room-name">${r.name || '이름없는 방'}</div>
+        <div class="room-meta">
+          <span>📂 ${r.category}</span>
+          <span>👤 ${r.host_nickname || '?'}</span>
+          <span>📝 ${r.question_count || 10}문제</span>
+        </div>
+      </div>
+      <div class="room-right">
+        <div class="room-players">${cur} / ${max}</div>
+        <div class="room-status">
+          ${isPlaying ? '<span class="badge badge-warn">진행중</span>' :
+            isFull ? '<span class="badge badge-yellow">만석</span>' :
+            '<span class="badge badge-accent">대기중</span>'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 입장 이벤트
+  document.querySelectorAll('.room-card').forEach(card => {
+    card.addEventListener('click', function() {
+      if (this.dataset.disabled === 'true') { showToast('입장할 수 없는 방입니다.'); return; }
+      joinRoom(this.dataset.id);
+    });
+  });
+}
+
+function updateStats() {
+  const waiting = allRooms.filter(r => r.status === 'waiting').length;
+  const playing = allRooms.filter(r => r.status === 'playing').length;
+  document.getElementById('openRoomsCount').textContent = waiting + '개';
+  document.getElementById('playingRoomsCount').textContent = playing + '개';
+}
+
+// ── 내 정보 ──
+function renderMyStat() {
+  const level = Auth.calcLevel(user.xp || 0);
+  const title = Auth.title(level);
+  const xp = user.xp || 0;
+  const nextLvXP = getNextLvXP(level);
+  const curLvXP  = getPrevLvXP(level);
+  const pct = nextLvXP > curLvXP ? Math.min(100, Math.round((xp - curLvXP) / (nextLvXP - curLvXP) * 100)) : 100;
+  const winRate = user.total_games > 0 ? Math.round(user.wins / user.total_games * 100) : 0;
+
+  document.getElementById('myStatContent').innerHTML = `
+    <div class="my-stat-row">
+      <span class="my-stat-label">닉네임</span>
+      <span class="my-stat-val">${user.nickname}</span>
+    </div>
+    <div class="my-stat-row">
+      <span class="my-stat-label">칭호</span>
+      <span class="my-stat-val text-primary">${title}</span>
+    </div>
+    <div class="my-stat-row">
+      <span class="my-stat-label">레벨</span>
+      <span class="my-stat-val">Lv.${level}</span>
+    </div>
+    <div class="my-stat-row">
+      <span class="my-stat-label">게임</span>
+      <span class="my-stat-val">${user.total_games || 0}전 ${user.wins || 0}승</span>
+    </div>
+    <div class="my-stat-row">
+      <span class="my-stat-label">승률</span>
+      <span class="my-stat-val text-accent">${winRate}%</span>
+    </div>
+    <div class="xp-bar-wrap">
+      <div class="xp-bar-info">
+        <span>XP ${xp}</span>
+        <span>다음 레벨 ${nextLvXP}</span>
+      </div>
+      <div class="xp-bar-bg"><div class="xp-bar-fill" style="width:${pct}%"></div></div>
+    </div>`;
+}
+
+function getNextLvXP(lv) {
+  const tbl = [0,100,300,600,1000,1500,2200,3000,4000,5500,7500];
+  if (lv < tbl.length) return tbl[lv];
+  return tbl[tbl.length-1] + (lv - tbl.length + 1) * 1000;
+}
+function getPrevLvXP(lv) {
+  return getNextLvXP(lv - 1);
+}
+
+// ── 미니 랭킹 ──
+async function loadMiniRanking() {
+  try {
+    const res = await API.getRanking();
+    const users = (res.data || []).sort((a,b) => (b.xp||0) - (a.xp||0)).slice(0,5);
+    const medals = ['gold','silver','bronze','',''];
+    document.getElementById('miniRanking').innerHTML = users.map((u,i) => `
+      <div class="rank-mini-item">
+        <div class="rank-num ${medals[i]}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
+        <div style="flex:1">${u.nickname}</div>
+        <div class="text-primary text-sm fw-bold">Lv.${Auth.calcLevel(u.xp||0)}</div>
+      </div>`).join('') || '<div class="text-muted text-sm">데이터 없음</div>';
+  } catch(e) {
+    document.getElementById('miniRanking').innerHTML = '<div class="text-muted text-sm">불러오기 실패</div>';
+  }
+}
+
+// ── 필터 ──
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    currentCat = this.dataset.cat;
+    renderRooms();
+  });
+});
+
+// ── 방 만들기 모달 ──
+document.getElementById('createRoomBtn').addEventListener('click', () => {
+  document.getElementById('createModal').style.display = 'flex';
+});
+document.getElementById('cancelRoomBtn').addEventListener('click', () => {
+  document.getElementById('createModal').style.display = 'none';
+});
+document.getElementById('createModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('createModal'))
+    document.getElementById('createModal').style.display = 'none';
+});
+
+// 카테고리 선택
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    selCat = this.dataset.cat;
+  });
+});
+
+// 인원 선택
+document.querySelectorAll('.num-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.num-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    selMax = parseInt(this.dataset.n);
+  });
+});
+
+// 방 만들기 확인
+document.getElementById('confirmCreateBtn').addEventListener('click', async () => {
+  const name = document.getElementById('roomName').value.trim();
+  if (!name) { showToast('방 이름을 입력해주세요.'); return; }
+
+  showLoading();
+  try {
+    // 퀴즈 미리 선택
+    const qRes = await API.getQuizzes(selCat);
+    const allQ = qRes.data || [];
+    const picked = shuffle(allQ.filter(q => q.category === selCat)).slice(0, 10);
+    if (picked.length < 3) { showToast('해당 카테고리 문제가 부족합니다.'); hideLoading(); return; }
+
+    const roomData = {
+      id: Auth.uuid(),
+      name,
+      host_id: user.id,
+      host_nickname: user.nickname,
+      category: selCat,
+      max_players: selMax,
+      current_players: 1,
+      is_public: true,
+      status: 'waiting',
+      question_count: picked.length,
+      question_ids: picked.map(q => q.id).join(','),
+      players_json: JSON.stringify([{ id: user.id, nickname: user.nickname, ready: false, score: 0 }]),
+      game_state_json: JSON.stringify({ questionIndex: 0, phase: 'waiting' })
+    };
+
+    const room = await API.createRoom(roomData);
+    document.getElementById('createModal').style.display = 'none';
+    window.location.href = `room.html?id=${room.id}`;
+  } catch(e) {
+    showToast('방 만들기 실패. 다시 시도해주세요.', 'error');
+  }
+  hideLoading();
+});
+
+// ── 빠른 매칭 ──
+document.getElementById('quickMatchBtn').addEventListener('click', async () => {
+  showLoading();
+  try {
+    const res = await API.getRooms();
+    const rooms = (res.data || []).filter(r =>
+      r.status === 'waiting' &&
+      r.is_public &&
+      (r.current_players || 1) < (r.max_players || 2) &&
+      r.host_id !== user.id
+    );
+    if (rooms.length === 0) { showToast('대기 중인 방이 없습니다. 방을 만들어보세요!'); hideLoading(); return; }
+    const room = rooms[Math.floor(Math.random() * rooms.length)];
+    joinRoom(room.id);
+  } catch(e) {
+    showToast('오류가 발생했습니다.', 'error');
+  }
+  hideLoading();
+});
+
+// ── 방 입장 ──
+async function joinRoom(roomId) {
+  showLoading();
+  try {
+    const room = await API.getRoomById(roomId);
+    if (!room) { showToast('방을 찾을 수 없습니다.'); hideLoading(); return; }
+    if (room.status === 'playing') { showToast('이미 진행 중인 방입니다.'); hideLoading(); return; }
+
+    const players = JSON.parse(room.players_json || '[]');
+    if (players.find(p => p.id === user.id)) {
+      // 이미 입장한 경우 그냥 이동
+      window.location.href = `room.html?id=${room.id}`;
+      return;
+    }
+    if (players.length >= room.max_players) { showToast('방이 가득 찼습니다.'); hideLoading(); return; }
+
+    players.push({ id: user.id, nickname: user.nickname, ready: false, score: 0 });
+    await API.updateRoom(room.id, {
+      current_players: players.length,
+      players_json: JSON.stringify(players)
+    });
+    window.location.href = `room.html?id=${room.id}`;
+  } catch(e) {
+    showToast('입장 실패. 다시 시도해주세요.', 'error');
+  }
+  hideLoading();
+}
+
+// ── 초기화 ──
+renderMyStat();
+loadRooms();
+loadMiniRanking();
+// 10초마다 방 목록 갱신
+setInterval(loadRooms, 10000);
+</script>
+</body>
+</html>
