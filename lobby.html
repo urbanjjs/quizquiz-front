@@ -230,6 +230,7 @@
 <script src="js/api.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/constants.js"></script>
 <script>
 const user = Auth.require();
 if (!user) throw new Error('not logged in');
@@ -241,7 +242,7 @@ let currentCat = '전체';
 let selCat = '일반상식';
 let selMax = 2;
 
-const CATS = { '일반상식':'🌍','역사사회':'📜','과학IT':'🔬','언어영어':'🔤','시사뉴스':'📰' };
+// CATS는 js/constants.js 에서 로드
 
 // ── 방 목록 로드 ──
 async function loadRooms() {
@@ -319,8 +320,8 @@ function renderMyStat() {
   const level = Auth.calcLevel(user.xp || 0);
   const title = Auth.title(level);
   const xp = user.xp || 0;
-  const nextLvXP = getNextLvXP(level);
-  const curLvXP  = getPrevLvXP(level);
+  const nextLvXP = Auth.getNextLvXP(level);
+  const curLvXP  = Auth.getPrevLvXP(level);
   const pct = nextLvXP > curLvXP ? Math.min(100, Math.round((xp - curLvXP) / (nextLvXP - curLvXP) * 100)) : 100;
   const winRate = user.total_games > 0 ? Math.round(user.wins / user.total_games * 100) : 0;
 
@@ -352,15 +353,6 @@ function renderMyStat() {
       </div>
       <div class="xp-bar-bg"><div class="xp-bar-fill" style="width:${pct}%"></div></div>
     </div>`;
-}
-
-function getNextLvXP(lv) {
-  const tbl = [0,100,300,600,1000,1500,2200,3000,4000,5500,7500];
-  if (lv < tbl.length) return tbl[lv];
-  return tbl[tbl.length-1] + (lv - tbl.length + 1) * 1000;
-}
-function getPrevLvXP(lv) {
-  return getNextLvXP(lv - 1);
 }
 
 // ── 미니 랭킹 ──

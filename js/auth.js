@@ -58,6 +58,18 @@ const Auth = {
     return Math.floor(10 + (xp - 7500) / 1000);
   },
 
+  /* 다음 레벨에 필요한 최소 XP */
+  getNextLvXP(lv) {
+    const tbl = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500, 7500];
+    if (lv < tbl.length) return tbl[lv];
+    return tbl[tbl.length - 1] + (lv - tbl.length + 1) * 1000;
+  },
+
+  /* 현재 레벨 시작 XP */
+  getPrevLvXP(lv) {
+    return this.getNextLvXP(lv - 1);
+  },
+
   /* 칭호 */
   title(level) {
     if (level <= 3)  return '🌱 새싹';

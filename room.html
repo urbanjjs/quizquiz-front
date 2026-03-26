@@ -106,6 +106,7 @@
 <script src="js/api.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/constants.js"></script>
 <script>
 const user = Auth.require();
 if (!user) throw new Error('not logged in');
@@ -119,7 +120,7 @@ let room = null;
 let pollTimer = null;
 let isLeaving = false;
 
-const CATS = { '일반상식':'🌍','역사사회':'📜','과학IT':'🔬','언어영어':'🔤','시사뉴스':'📰' };
+// CATS는 js/constants.js 에서 로드
 
 // ── 방 정보 렌더 ──
 function renderRoom(r) {
