@@ -37,10 +37,10 @@ const API = {
   },
 
   /* ── quizzes ── */
-  async getQuizzes(category) {
+  async getQuizzes(category, limit = 10000) {
     const url = category
-      ? `/api/quizzes?search=${encodeURIComponent(category)}&limit=200`
-      : '/api/quizzes?limit=200';
+      ? `/api/quizzes?search=${encodeURIComponent(category)}&limit=${limit}`
+      : `/api/quizzes?limit=${limit}`;
     return this.req('GET', url);
   },
 
