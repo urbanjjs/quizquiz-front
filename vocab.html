@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>단어 집중학습 — 퀴즈퀴즈</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+* { user-select: none; }
+
+/* ── 설정 화면 ── */
+#setupScreen { max-width: 520px; margin: 0 auto; padding: 0 16px 80px; }
+
+.vocab-hero {
+  text-align: center;
+  background: linear-gradient(135deg, #0d1f3c 0%, #1a1040 50%, #0d1f3c 100%);
+  border: 1px solid rgba(100,160,255,.25);
+  border-radius: 20px;
+  padding: 32px 24px 24px;
+  margin-bottom: 20px;
+}
+.vocab-hero .icon { font-size: 48px; margin-bottom: 8px; }
+.vocab-hero h2 { font-size: 24px; font-weight: 900; margin-bottom: 6px; }
+.vocab-hero .sub { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+.setup-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 14px;
+}
+.setup-label {
+  font-size: 12px; font-weight: 700;
+  color: var(--muted); letter-spacing: .5px;
+  text-transform: uppercase; margin-bottom: 12px;
+}
+
+/* 상황 그리드 */
+.sit-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.sit-btn {
+  padding: 12px 10px;
+  border: 1.5px solid var(--border); border-radius: 12px;
+  background: var(--surface2); color: var(--text);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.sit-btn.active { border-color: var(--primary); background: rgba(108,99,255,.12); }
+.sit-btn .emoji { font-size: 22px; }
+.sit-btn .name { font-size: 12px; }
+.sit-btn .cnt { font-size: 11px; color: var(--muted); }
+.sit-btn .bar { width: 100%; height: 4px; background: var(--surface); border-radius: 2px; overflow: hidden; }
+.sit-btn .bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
+
+/* 통계 카드 */
+.stat-row { display: flex; gap: 10px; margin-bottom: 14px; }
+.stat-box {
+  flex: 1; text-align: center;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 8px;
+}
+.stat-box .val { font-size: 22px; font-weight: 900; color: var(--primary); }
+.stat-box .lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* 빠른시작 버튼 */
+.quick-btns { display: flex; flex-direction: column; gap: 8px; }
+.quick-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 600; color: var(--text);
+  transition: all .15s;
+}
+.quick-btn:hover { border-color: var(--primary); }
+.quick-btn .icon { font-size: 20px; }
+.quick-btn .desc { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+/* ── 플래시카드 화면 ── */
+#gameScreen { display: none; max-width: 520px; margin: 0 auto; padding: 0 16px 80px; }
+
+.game-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.game-header .info { font-size: 14px; font-weight: 700; }
+.game-header .round { font-size: 12px; color: var(--muted); }
+.progress-bg {
+  height: 6px; background: var(--surface2); border-radius: 99px; margin-bottom: 20px; overflow: hidden;
+}
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 99px; transition: width .3s; }
+
+/* 카드 */
+.card-container {
+  perspective: 1000px;
+  margin-bottom: 20px;
+}
+.card-flip {
+  position: relative;
+  width: 100%; min-height: 320px;
+  transition: transform .5s;
+  transform-style: preserve-3d;
+  cursor: pointer;
+}
+.card-flip.flipped { transform: rotateY(180deg); }
+
+.card-face {
+  position: absolute; inset: 0;
+  backface-visibility: hidden;
+  border-radius: 20px;
+  padding: 28px 24px;
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+.card-front {
+  background: linear-gradient(135deg, #1a1845, #1a2540);
+  border: 1px solid var(--border);
+}
+.card-back {
+  background: linear-gradient(135deg, #0d2818, #0d1f3c);
+  border: 1px solid rgba(67,233,123,.3);
+  transform: rotateY(180deg);
+}
+
+.card-tag {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 6px;
+}
+.card-tag .badge {
+  background: rgba(108,99,255,.2); color: var(--primary);
+  padding: 2px 8px; border-radius: 6px; font-size: 10px;
+}
+
+.card-korean {
+  font-size: 22px; font-weight: 900; line-height: 1.5;
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 10px 0;
+}
+
+.card-english {
+  font-size: 26px; font-weight: 900; color: #43e97b;
+  text-align: center; margin-bottom: 16px;
+  line-height: 1.4;
+}
+.card-hint-area {
+  text-align: center; margin-top: auto;
+}
+.card-hint-btn {
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 99px; padding: 6px 16px;
+  color: var(--muted); font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.card-hint-text {
+  display: none;
+  font-size: 13px; color: var(--muted); line-height: 1.6;
+  margin-top: 10px;
+}
+.card-hint-text.show { display: block; }
+
+.card-example {
+  background: rgba(255,255,255,.05);
+  border-radius: 12px; padding: 14px;
+  margin-top: 12px;
+}
+.card-example .label { font-size: 11px; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
+.card-example .text { font-size: 14px; color: var(--text); line-height: 1.6; font-style: italic; }
+
+.card-memo {
+  font-size: 13px; color: var(--muted); line-height: 1.5;
+  text-align: center; margin-top: 10px;
+}
+
+.flip-hint {
+  text-align: center; font-size: 12px; color: var(--muted);
+  margin-bottom: 16px; opacity: .7;
+}
+
+/* 평가 버튼 */
+.eval-btns {
+  display: flex; gap: 10px;
+}
+.eval-btn {
+  flex: 1; padding: 16px;
+  border-radius: 14px; border: 2px solid;
+  font-family: inherit; font-size: 15px; font-weight: 800;
+  cursor: pointer; transition: all .15s;
+}
+.eval-btn.wrong {
+  background: rgba(255,101,132,.08); border-color: rgba(255,101,132,.3); color: #ff6584;
+}
+.eval-btn.wrong:hover { background: rgba(255,101,132,.18); }
+.eval-btn.correct {
+  background: rgba(67,233,123,.08); border-color: rgba(67,233,123,.3); color: #43e97b;
+}
+.eval-btn.correct:hover { background: rgba(67,233,123,.18); }
+
+/* ── 결과 화면 ── */
+#resultScreen { display: none; max-width: 520px; margin: 0 auto; padding: 0 16px 80px; text-align: center; }
+
+.result-hero {
+  background: linear-gradient(135deg, #1a1845, #1a2540);
+  border: 1px solid var(--border);
+  border-radius: 20px; padding: 36px 24px; margin-bottom: 20px;
+}
+.result-hero .icon { font-size: 56px; margin-bottom: 10px; }
+.result-hero h2 { font-size: 24px; font-weight: 900; margin-bottom: 6px; }
+.result-hero .sub { font-size: 14px; color: var(--muted); }
+
+.round-list { text-align: left; margin-bottom: 20px; }
+.round-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; margin-bottom: 6px;
+  font-size: 14px; font-weight: 600;
+}
+.round-item .r-ok { color: #43e97b; }
+.round-item .r-fail { color: #ff6584; }
+
+.mastered-list {
+  text-align: left;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px; margin-bottom: 20px;
+}
+.mastered-list h4 { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.mastered-item {
+  display: flex; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.mastered-item:last-child { border-bottom: none; }
+.mastered-item .kr { color: var(--muted); }
+.mastered-item .en { color: #43e97b; font-weight: 700; }
+
+.result-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.result-btns .btn { flex: 1; min-width: 120px; }
+</style>
+</head>
+<body>
+
+<div id="topbar" class="topbar"></div>
+
+<!-- ═══ 설정 화면 ═══ -->
+<div id="setupScreen">
+  <div class="vocab-hero">
+    <div class="icon">📖</div>
+    <h2>영어단어 집중학습</h2>
+    <div class="sub">모를 때까지 반복 — 플래시카드로 완전 암기</div>
+  </div>
+
+  <!-- 오늘의 학습 -->
+  <div class="stat-row" id="statRow">
+    <div class="stat-box">
+      <div class="val" id="statToday">0</div>
+      <div class="lbl">오늘 학습</div>
+    </div>
+    <div class="stat-box">
+      <div class="val" id="statMastered">0</div>
+      <div class="lbl">마스터</div>
+    </div>
+    <div class="stat-box">
+      <div class="val" id="statWrong">0</div>
+      <div class="lbl">오답노트</div>
+    </div>
+    <div class="stat-box">
+      <div class="val" id="statStreak">0</div>
+      <div class="lbl">연속일</div>
+    </div>
+  </div>
+
+  <!-- 상황 선택 -->
+  <div class="setup-card">
+    <div class="setup-label">상황 선택</div>
+    <div class="sit-grid" id="sitGrid"></div>
+  </div>
+
+  <!-- 빠른 시작 -->
+  <div class="setup-card">
+    <div class="setup-label">빠른 시작</div>
+    <div class="quick-btns">
+      <button class="quick-btn" id="btnWrongReview">
+        <span class="icon">📝</span>
+        <div>
+          <div>오답 복습</div>
+          <div class="desc">틀린 단어만 집중 복습</div>
+        </div>
+      </button>
+      <button class="quick-btn" id="btnRandom">
+        <span class="icon">🔀</span>
+        <div>
+          <div>랜덤 10문항</div>
+          <div class="desc">전체에서 무작위 출제</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <button class="btn btn-primary btn-full btn-lg" id="startBtn" style="margin-top:6px">🚀 학습 시작</button>
+</div>
+
+<!-- ═══ 플래시카드 화면 ═══ -->
+<div id="gameScreen">
+  <div class="game-header">
+    <div>
+      <span class="info" id="gameProgress">1 / 10</span>
+      <span class="round" id="gameRound">라운드 1</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="quitBtn">나가기</button>
+  </div>
+  <div class="progress-bg">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <div class="card-container" id="cardContainer">
+    <div class="card-flip" id="card">
+      <!-- 앞면 -->
+      <div class="card-face card-front" id="cardFront">
+        <div class="card-tag">
+          <span id="frontSituation">🏠 가정생활</span>
+          <span class="badge" id="frontDiff">easy</span>
+        </div>
+        <div class="card-korean" id="frontKorean">
+          먼지를 털다, 닦다
+        </div>
+        <div class="card-hint-area">
+          <button class="card-hint-btn" id="hintBtn">💡 힌트 보기</button>
+          <div class="card-hint-text" id="hintText"></div>
+        </div>
+      </div>
+      <!-- 뒷면 -->
+      <div class="card-face card-back" id="cardBack">
+        <div class="card-tag">
+          <span id="backSituation">🏠 가정생활</span>
+        </div>
+        <div class="card-english" id="backEnglish">dust</div>
+        <div class="card-memo" id="backMemo">명사로는 먼지라는 뜻도 있어요</div>
+        <div class="card-example" id="backExample">
+          <div class="label">💬 예문</div>
+          <div class="text" id="backSentence"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flip-hint" id="flipHint">👆 카드를 탭하여 정답 확인</div>
+
+  <div class="eval-btns" id="evalBtns" style="display:none">
+    <button class="eval-btn wrong" id="btnDontKnow">😕 모르겠어요</button>
+    <button class="eval-btn correct" id="btnKnow">😊 알겠어요</button>
+  </div>
+</div>
+
+<!-- ═══ 결과 화면 ═══ -->
+<div id="resultScreen">
+  <div class="result-hero">
+    <div class="icon" id="resultIcon">🎉</div>
+    <h2 id="resultTitle">학습 완료!</h2>
+    <div class="sub" id="resultSub"></div>
+  </div>
+
+  <div class="round-list" id="roundList"></div>
+
+  <div class="mastered-list" id="masteredList">
+    <h4>✅ 이번에 외운 표현</h4>
+    <div id="masteredItems"></div>
+  </div>
+
+  <div class="result-btns">
+    <button class="btn btn-primary" id="btnRetry">다시 학습</button>
+    <button class="btn btn-accent" id="btnWrongRetry">오답 복습</button>
+    <button class="btn btn-ghost" onclick="location.href='lobby.html'">로비로</button>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/constants.js"></script>
+<script>
+const user = Auth.require();
+if (!user) throw new Error('not logged in');
+renderTopbar(user);
+
+/* ════════════════════════════════
+   상황 정의
+════════════════════════════════ */
+const SITUATIONS = [
+  { key: '가정생활', emoji: '🏠' },
+  { key: '직장업무', emoji: '💼' },
+  { key: '여행교통', emoji: '✈️' },
+  { key: '음식외식', emoji: '🍽️' },
+  { key: '쇼핑소비', emoji: '🛍️' },
+  { key: '의료건강', emoji: '🏥' },
+  { key: '교육학교', emoji: '📚' },
+  { key: '여가취미', emoji: '🎮' },
+  { key: '사회관계', emoji: '👥' },
+  { key: '긴급위기', emoji: '🚨' },
+];
+
+const SIT_MAP = {};
+SITUATIONS.forEach(s => SIT_MAP[s.key] = s);
+
+/* ════════════════════════════════
+   로컬 저장소
+════════════════════════════════ */
+function loadStore(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) || fallback; }
+  catch { return fallback; }
+}
+function saveStore(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
+let wrongNotes = loadStore('qq_wrong_notes', {});
+let studyStats = loadStore('qq_study_stats', { totalStudied: 0, streak: 0, lastDate: '', todayCount: 0 });
+let progress   = loadStore('qq_study_progress', {});
+
+// 오늘 날짜 체크
+const today = new Date().toISOString().slice(0, 10);
+if (studyStats.lastDate !== today) {
+  if (studyStats.lastDate === new Date(Date.now() - 86400000).toISOString().slice(0, 10)) {
+    studyStats.streak++;
+  } else if (studyStats.lastDate !== today) {
+    studyStats.streak = studyStats.lastDate ? 0 : 0;
+  }
+  studyStats.todayCount = 0;
+  studyStats.lastDate = today;
+  saveStore('qq_study_stats', studyStats);
+}
+
+/* ════════════════════════════════
+   상태
+════════════════════════════════ */
+let allQuizzes = [];
+let selectedSit = null;
+let quizQueue = [];
+let currentIdx = 0;
+let roundNum = 1;
+let roundResults = [];  // [{round, total, correct}]
+let sessionWrong = [];
+let sessionCorrect = [];
+
+/* ════════════════════════════════
+   초기화
+════════════════════════════════ */
+async function init() {
+  showLoading();
+  try {
+    const res = await API.getQuizzes('생활영어');
+    allQuizzes = (res.data || []).filter(q => q.category === '생활영어');
+  } catch(e) {
+    showToast('문제를 불러오지 못했습니다.', 'error');
+  }
+  hideLoading();
+  buildSitGrid();
+  updateStats();
+}
+
+function updateStats() {
+  const masteredCount = Object.values(progress).reduce((s, p) => s + (p.mastered || 0), 0);
+  const wrongCount = Object.keys(wrongNotes).length;
+  document.getElementById('statToday').textContent = studyStats.todayCount;
+  document.getElementById('statMastered').textContent = masteredCount;
+  document.getElementById('statWrong').textContent = wrongCount;
+  document.getElementById('statStreak').textContent = studyStats.streak;
+
+  document.getElementById('btnWrongReview').querySelector('.desc').textContent =
+    wrongCount > 0 ? `틀린 단어 ${wrongCount}개 집중 복습` : '오답이 없습니다';
+}
+
+function buildSitGrid() {
+  const grid = document.getElementById('sitGrid');
+  grid.innerHTML = '';
+  SITUATIONS.forEach(sit => {
+    const count = allQuizzes.filter(q => q.situation === sit.key).length;
+    const prog = progress[sit.key] || { total: count, mastered: 0 };
+    const pct = count > 0 ? Math.round((prog.mastered / count) * 100) : 0;
+
+    const btn = document.createElement('button');
+    btn.className = 'sit-btn' + (selectedSit === sit.key ? ' active' : '');
+    btn.innerHTML = `
+      <span class="emoji">${sit.emoji}</span>
+      <span class="name">${sit.key}</span>
+      <span class="cnt">${count}단어 · ${pct}%</span>
+      <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>`;
+    btn.onclick = () => {
+      selectedSit = selectedSit === sit.key ? null : sit.key;
+      buildSitGrid();
+    };
+    grid.appendChild(btn);
+  });
+}
+
+/* ════════════════════════════════
+   한국어 추출
+════════════════════════════════ */
+function extractKorean(q) {
+  let text = q.question;
+  if (q.type === 'translate') {
+    return text.replace(/를?\s*영어로.*$/, '').trim();
+  }
+  if (q.type === 'vocab') {
+    return text.replace(/(이?라는|의)\s*뜻의.*$/, '').replace(/를?\s*영어로.*$/, '').trim();
+  }
+  // expression
+  return text
+    .replace(/(라고\s*(말|할)\s*때|할\s*때).*$/s, '')
+    .replace(/를?\s*영어로.*$/, '')
+    .replace(/가장\s*자연스러운.*$/, '')
+    .trim();
+}
+
+function getAnswer(q) {
+  const key = 'option_' + q.answer.toLowerCase();
+  return q[key] || q.option_a;
+}
+
+/* ════════════════════════════════
+   세션 시작
+════════════════════════════════ */
+function startSession(quizzes) {
+  if (quizzes.length === 0) {
+    showToast('학습할 문제가 없습니다.', 'error');
+    return;
+  }
+  quizQueue = shuffle([...quizzes]);
+  currentIdx = 0;
+  roundNum = 1;
+  roundResults = [];
+  sessionWrong = [];
+  sessionCorrect = [];
+
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('resultScreen').style.display = 'none';
+  document.getElementById('gameScreen').style.display = 'block';
+
+  renderCard();
+}
+
+document.getElementById('startBtn').onclick = () => {
+  let pool = allQuizzes;
+  if (selectedSit) pool = pool.filter(q => q.situation === selectedSit);
+  startSession(pool);
+};
+
+document.getElementById('btnRandom').onclick = () => {
+  startSession(shuffle(allQuizzes).slice(0, 10));
+};
+
+document.getElementById('btnWrongReview').onclick = () => {
+  const wrongIds = Object.keys(wrongNotes);
+  if (wrongIds.length === 0) { showToast('오답이 없습니다!', 'success'); return; }
+  const pool = allQuizzes.filter(q => wrongIds.includes(q.id));
+  startSession(pool);
+};
+
+document.getElementById('quitBtn').onclick = () => {
+  document.getElementById('gameScreen').style.display = 'none';
+  document.getElementById('setupScreen').style.display = 'block';
+  updateStats();
+  buildSitGrid();
+};
+
+/* ════════════════════════════════
+   카드 렌더
+════════════════════════════════ */
+function renderCard() {
+  const q = quizQueue[currentIdx];
+  const sit = SIT_MAP[q.situation] || { emoji: '🎯' };
+  const answer = getAnswer(q);
+
+  // 진행률
+  document.getElementById('gameProgress').textContent = `${currentIdx + 1} / ${quizQueue.length}`;
+  document.getElementById('gameRound').textContent = `라운드 ${roundNum}`;
+  document.getElementById('progressFill').style.width = `${((currentIdx) / quizQueue.length) * 100}%`;
+
+  // 앞면
+  document.getElementById('frontSituation').textContent = `${sit.emoji} ${q.situation}`;
+  document.getElementById('frontDiff').textContent = q.difficulty;
+  document.getElementById('frontKorean').textContent = extractKorean(q);
+  document.getElementById('hintText').textContent = q.hint || '';
+  document.getElementById('hintText').classList.remove('show');
+
+  // 뒷면
+  document.getElementById('backSituation').textContent = `${sit.emoji} ${q.situation}`;
+  document.getElementById('backEnglish').textContent = answer;
+  document.getElementById('backMemo').textContent = q.hint || '';
+  document.getElementById('backSentence').textContent = q.en_sentence || '';
+  document.getElementById('backExample').style.display = q.en_sentence ? 'block' : 'none';
+
+  // 카드 초기화
+  document.getElementById('card').classList.remove('flipped');
+  document.getElementById('evalBtns').style.display = 'none';
+  document.getElementById('flipHint').style.display = 'block';
+}
+
+/* ── 카드 뒤집기 ── */
+document.getElementById('cardContainer').onclick = () => {
+  const card = document.getElementById('card');
+  if (!card.classList.contains('flipped')) {
+    card.classList.add('flipped');
+    document.getElementById('evalBtns').style.display = 'flex';
+    document.getElementById('flipHint').style.display = 'none';
+  }
+};
+
+/* ── 힌트 ── */
+document.getElementById('hintBtn').onclick = (e) => {
+  e.stopPropagation();
+  document.getElementById('hintText').classList.toggle('show');
+};
+
+/* ── 알겠어요 / 모르겠어요 ── */
+document.getElementById('btnKnow').onclick = () => evaluate(true);
+document.getElementById('btnDontKnow').onclick = () => evaluate(false);
+
+function evaluate(known) {
+  const q = quizQueue[currentIdx];
+
+  if (known) {
+    sessionCorrect.push(q);
+    // 오답노트에서 제거 (3회 연속 정답 로직 간소화: 맞추면 제거)
+    delete wrongNotes[q.id];
+    // 진도 업데이트
+    if (!progress[q.situation]) progress[q.situation] = { total: 0, mastered: 0 };
+    progress[q.situation].mastered = allQuizzes
+      .filter(qq => qq.situation === q.situation)
+      .filter(qq => !wrongNotes[qq.id])
+      .length;
+  } else {
+    sessionWrong.push(q);
+    wrongNotes[q.id] = { count: (wrongNotes[q.id]?.count || 0) + 1, lastWrong: Date.now() };
+  }
+
+  studyStats.todayCount++;
+  saveStore('qq_wrong_notes', wrongNotes);
+  saveStore('qq_study_stats', studyStats);
+  saveStore('qq_study_progress', progress);
+
+  currentIdx++;
+
+  if (currentIdx >= quizQueue.length) {
+    // 라운드 완료
+    roundResults.push({ round: roundNum, total: quizQueue.length, correct: quizQueue.length - sessionWrong.length });
+
+    if (sessionWrong.length > 0) {
+      // 틀린 것만 다음 라운드
+      roundNum++;
+      quizQueue = shuffle([...sessionWrong]);
+      sessionWrong = [];
+      currentIdx = 0;
+      showToast(`라운드 ${roundNum} — 틀린 ${quizQueue.length}개 재도전!`, 'normal');
+      renderCard();
+    } else {
+      // 전부 맞춤 → 결과
+      showResult();
+    }
+  } else {
+    renderCard();
+  }
+}
+
+/* ════════════════════════════════
+   결과 화면
+════════════════════════════════ */
+function showResult() {
+  document.getElementById('gameScreen').style.display = 'none';
+  document.getElementById('resultScreen').style.display = 'block';
+
+  const totalQ = roundResults[0]?.total || 0;
+  const totalRounds = roundResults.length;
+
+  if (totalRounds === 1) {
+    document.getElementById('resultIcon').textContent = '🏆';
+    document.getElementById('resultTitle').textContent = '퍼펙트!';
+    document.getElementById('resultSub').textContent = `${totalQ}개 전부 맞혔어요`;
+  } else {
+    document.getElementById('resultIcon').textContent = '🎉';
+    document.getElementById('resultTitle').textContent = '학습 완료!';
+    document.getElementById('resultSub').textContent = `${totalRounds}라운드 만에 ${totalQ}개 완전 정복`;
+  }
+
+  // 라운드 목록
+  document.getElementById('roundList').innerHTML = roundResults.map(r =>
+    `<div class="round-item">
+      <span>라운드 ${r.round}</span>
+      <span>
+        <span class="r-ok">${r.correct}정답</span> /
+        <span class="r-fail">${r.total - r.correct}오답</span>
+      </span>
+    </div>`
+  ).join('');
+
+  // 외운 표현 목록
+  const items = sessionCorrect.slice(0, 15).map(q =>
+    `<div class="mastered-item">
+      <span class="kr">${extractKorean(q)}</span>
+      <span class="en">${getAnswer(q)}</span>
+    </div>`
+  ).join('');
+  document.getElementById('masteredItems').innerHTML = items || '<div style="color:var(--muted);font-size:13px">없음</div>';
+
+  updateStats();
+}
+
+document.getElementById('btnRetry').onclick = () => {
+  document.getElementById('resultScreen').style.display = 'none';
+  document.getElementById('setupScreen').style.display = 'block';
+  buildSitGrid();
+};
+
+document.getElementById('btnWrongRetry').onclick = () => {
+  const wrongIds = Object.keys(wrongNotes);
+  if (wrongIds.length === 0) { showToast('오답이 없습니다!', 'success'); return; }
+  document.getElementById('resultScreen').style.display = 'none';
+  startSession(allQuizzes.filter(q => wrongIds.includes(q.id)));
+};
+
+/* ── 시작 ── */
+init();
+</script>
+</body>
+</html>
