@@ -149,7 +149,7 @@
 <script src="js/utils.js"></script>
 <script>
 // 이미 로그인 시 로비로
-if (Auth.isLoggedIn()) window.location.href = 'lobby.html';
+if (Auth.isLoggedIn()) window.location.href = 'vocab.html';
 
 // 탭 전환
 document.querySelectorAll('.auth-tab').forEach(tab => {
@@ -198,7 +198,7 @@ async function doLogin() {
       return;
     }
     Auth.set(user);
-    window.location.href = 'lobby.html';
+    window.location.href = 'vocab.html';
   } catch (e) {
     console.error('로그인 오류:', e);
     errEl.textContent = `오류: ${e.message || '잠시 후 다시 시도해주세요.'}`;

@@ -86,13 +86,14 @@ function renderTopbar(user) {
   const initial = (user.nickname || '?')[0].toUpperCase();
   const level = Auth.calcLevel(user.xp || 0);
   tb.innerHTML = `
-    <a class="topbar-logo" href="lobby.html">🎯 퀴즈퀴즈</a>
+    <a class="topbar-logo" href="vocab.html">🎯 퀴즈퀴즈</a>
     <div class="topbar-user">
       <div class="topbar-avatar">${initial}</div>
       <div>
         <div class="topbar-nick">${user.nickname}</div>
         <div class="topbar-level">Lv.${level} ${Auth.title(level)}</div>
       </div>
+      <a href="lobby.html" class="btn btn-ghost btn-sm">🏠 로비로</a>
       <a href="ranking.html" class="btn btn-ghost btn-sm hide-mobile">🏆 랭킹</a>
       <a href="admin.html" class="btn btn-ghost btn-sm hide-mobile">📝 관리</a>
       <button class="btn btn-ghost btn-sm" id="logoutBtn">로그아웃</button>
