@@ -8,27 +8,39 @@
 <style>
 * { user-select: none; }
 
+/* ── 미니 헤더 ── */
+.mini-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 16px;
+  max-width: 520px; margin: 0 auto;
+}
+.mini-logo {
+  font-size: 14px; font-weight: 800; color: var(--muted);
+  text-decoration: none;
+}
+.mini-header .btn-sm { font-size: 12px; padding: 5px 10px; }
+
 /* ── 설정 화면 ── */
-#setupScreen { max-width: 520px; margin: 0 auto; padding: 0 16px 80px; }
+#setupScreen { max-width: 520px; margin: 0 auto; padding: 0 16px 40px; }
 
 .vocab-hero {
   text-align: center;
   background: linear-gradient(135deg, #0d1f3c 0%, #1a1040 50%, #0d1f3c 100%);
   border: 1px solid rgba(100,160,255,.25);
-  border-radius: 20px;
-  padding: 32px 24px 24px;
-  margin-bottom: 20px;
+  border-radius: 16px;
+  padding: 18px 20px 16px;
+  margin-bottom: 14px;
 }
-.vocab-hero .icon { font-size: 48px; margin-bottom: 8px; }
-.vocab-hero h2 { font-size: 24px; font-weight: 900; margin-bottom: 6px; }
-.vocab-hero .sub { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.vocab-hero .icon { font-size: 32px; margin-bottom: 4px; }
+.vocab-hero h2 { font-size: 18px; font-weight: 900; margin-bottom: 4px; }
+.vocab-hero .sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
 
 .setup-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 20px;
-  margin-bottom: 14px;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
 }
 .setup-label {
   font-size: 12px; font-weight: 700;
@@ -57,23 +69,23 @@
 .sit-btn .bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
 
 /* 통계 카드 */
-.stat-row { display: flex; gap: 10px; margin-bottom: 14px; }
+.stat-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .stat-box {
   flex: 1; text-align: center;
   background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 12px; padding: 14px 8px;
+  border-radius: 10px; padding: 10px 6px;
 }
-.stat-box .val { font-size: 22px; font-weight: 900; color: var(--primary); }
-.stat-box .lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.stat-box .val { font-size: 18px; font-weight: 900; color: var(--primary); }
+.stat-box .lbl { font-size: 10px; color: var(--muted); margin-top: 1px; }
 
 /* 빠른시작 버튼 */
 .quick-btns { display: flex; flex-direction: column; gap: 8px; }
 .quick-btn {
   display: flex; align-items: center; gap: 10px;
-  padding: 14px 16px;
+  padding: 10px 14px;
   background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 12px; cursor: pointer;
-  font-family: inherit; font-size: 14px; font-weight: 600; color: var(--text);
+  border-radius: 10px; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text);
   transition: all .15s;
 }
 .quick-btn:hover { border-color: var(--primary); }
@@ -81,27 +93,27 @@
 .quick-btn .desc { font-size: 11px; color: var(--muted); font-weight: 400; }
 
 /* ── 플래시카드 화면 ── */
-#gameScreen { display: none; max-width: 520px; margin: 0 auto; padding: 0 16px 80px; }
+#gameScreen { display: none; max-width: 520px; margin: 0 auto; padding: 0 16px 40px; }
 
 .game-header {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .game-header .info { font-size: 14px; font-weight: 700; }
 .game-header .round { font-size: 12px; color: var(--muted); }
 .progress-bg {
-  height: 6px; background: var(--surface2); border-radius: 99px; margin-bottom: 20px; overflow: hidden;
+  height: 5px; background: var(--surface2); border-radius: 99px; margin-bottom: 12px; overflow: hidden;
 }
 .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 99px; transition: width .3s; }
 
 /* 카드 */
 .card-container {
   perspective: 1000px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 .card-flip {
   position: relative;
-  width: 100%; min-height: 320px;
+  width: 100%; min-height: 260px;
   transition: transform .5s;
   transform-style: preserve-3d;
   cursor: pointer;
@@ -111,8 +123,8 @@
 .card-face {
   position: absolute; inset: 0;
   backface-visibility: hidden;
-  border-radius: 20px;
-  padding: 28px 24px;
+  border-radius: 16px;
+  padding: 18px 20px;
   display: flex; flex-direction: column;
   overflow-y: auto;
 }
@@ -128,7 +140,7 @@
 
 .card-tag {
   font-size: 11px; font-weight: 700; color: var(--muted);
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   display: flex; align-items: center; gap: 6px;
 }
 .card-tag .badge {
@@ -137,15 +149,15 @@
 }
 
 .card-korean {
-  font-size: 22px; font-weight: 900; line-height: 1.5;
+  font-size: 20px; font-weight: 900; line-height: 1.4;
   flex: 1; display: flex; align-items: center; justify-content: center;
-  text-align: center; padding: 10px 0;
+  text-align: center; padding: 6px 0;
 }
 
 .card-english {
-  font-size: 26px; font-weight: 900; color: #43e97b;
-  text-align: center; margin-bottom: 16px;
-  line-height: 1.4;
+  font-size: 22px; font-weight: 900; color: #43e97b;
+  text-align: center; margin-bottom: 10px;
+  line-height: 1.3;
 }
 .card-hint-area {
   text-align: center; margin-top: auto;
@@ -165,11 +177,11 @@
 
 .card-example {
   background: rgba(255,255,255,.05);
-  border-radius: 12px; padding: 14px;
-  margin-top: 12px;
+  border-radius: 10px; padding: 10px 12px;
+  margin-top: 8px;
 }
-.card-example .label { font-size: 11px; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
-.card-example .text { font-size: 14px; color: var(--text); line-height: 1.6; font-style: italic; }
+.card-example .label { font-size: 10px; color: var(--muted); margin-bottom: 4px; font-weight: 700; }
+.card-example .text { font-size: 13px; color: var(--text); line-height: 1.5; font-style: italic; }
 
 .card-memo {
   font-size: 13px; color: var(--muted); line-height: 1.5;
@@ -178,17 +190,17 @@
 
 .flip-hint {
   text-align: center; font-size: 12px; color: var(--muted);
-  margin-bottom: 16px; opacity: .7;
+  margin-bottom: 10px; opacity: .7;
 }
 
 /* 평가 버튼 */
 .eval-btns {
-  display: flex; gap: 10px;
+  display: flex; gap: 8px;
 }
 .eval-btn {
-  flex: 1; padding: 16px;
-  border-radius: 14px; border: 2px solid;
-  font-family: inherit; font-size: 15px; font-weight: 800;
+  flex: 1; padding: 14px;
+  border-radius: 12px; border: 2px solid;
+  font-family: inherit; font-size: 14px; font-weight: 800;
   cursor: pointer; transition: all .15s;
 }
 .eval-btn.wrong {
@@ -244,7 +256,13 @@
 </head>
 <body>
 
-<div id="topbar" class="topbar"></div>
+<div class="mini-header">
+  <a class="mini-logo" href="vocab.html">🎯 퀴즈퀴즈</a>
+  <div style="display:flex;gap:6px;align-items:center">
+    <a href="lobby.html" class="btn btn-ghost btn-sm">🏠 로비로</a>
+    <a href="ranking.html" class="btn btn-ghost btn-sm hide-mobile">🏆</a>
+  </div>
+</div>
 
 <!-- ═══ 설정 화면 ═══ -->
 <div id="setupScreen">
@@ -387,7 +405,7 @@
 <script>
 const user = Auth.require();
 if (!user) throw new Error('not logged in');
-renderTopbar(user);
+// topbar는 미니 헤더로 대체됨
 
 /* ════════════════════════════════
    상황 정의
