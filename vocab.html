@@ -79,17 +79,19 @@
 .stat-box .lbl { font-size: 10px; color: var(--muted); margin-top: 1px; }
 
 /* 빠른시작 버튼 */
-.quick-btns { display: flex; gap: 6px; }
+.quick-btns { display: flex; gap: 5px; flex-wrap: wrap; }
 .quick-btn {
-  flex: 1; display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px;
+  flex: 1 1 calc(33% - 5px); min-width: 100px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 8px;
   background: var(--surface2); border: 1px solid var(--border);
   border-radius: 8px; cursor: pointer;
-  font-family: inherit; font-size: 12px; font-weight: 600; color: var(--text);
+  font-family: inherit; font-size: 11px; font-weight: 600; color: var(--text);
   transition: all .15s;
+  text-align: left;
 }
 .quick-btn:hover { border-color: var(--primary); }
-.quick-btn .icon { font-size: 16px; }
+.quick-btn .icon { font-size: 15px; flex-shrink: 0; }
 .quick-btn .desc { font-size: 9px; color: var(--muted); font-weight: 400; }
 
 /* ── 플래시카드 화면 ── */
@@ -399,6 +401,13 @@
         <div>
           <div>랜덤 10문항</div>
           <div class="desc">전체에서 무작위 출제</div>
+        </div>
+      </button>
+      <button class="quick-btn" id="btnSitRandom">
+        <span class="icon">🎯</span>
+        <div>
+          <div>선택 상황 랜덤 10</div>
+          <div class="desc">선택한 영역에서 10문항</div>
         </div>
       </button>
     </div>
@@ -871,6 +880,19 @@ document.getElementById('startBtn').onclick = () => {
 
 document.getElementById('btnRandom').onclick = () => {
   startSession(shuffle(allQuizzes).slice(0, 10), { situation: '랜덤', mode: 'random' });
+};
+
+document.getElementById('btnSitRandom').onclick = () => {
+  if (!selectedSit) {
+    showToast('먼저 상황을 선택해주세요', 'error');
+    return;
+  }
+  const pool = allQuizzes.filter(q => q.situation === selectedSit);
+  if (pool.length === 0) {
+    showToast('해당 영역에 문제가 없습니다', 'error');
+    return;
+  }
+  startSession(shuffle(pool).slice(0, 10), { situation: selectedSit, mode: 'random_sit' });
 };
 
 document.getElementById('btnWrongReview').onclick = () => {
