@@ -83,6 +83,62 @@
   background: var(--surface); border: 1px dashed var(--border);
   border-radius: 12px; color: var(--muted); font-size: 13px;
 }
+
+/* ── 상세 모달 ── */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 1000;
+  align-items: flex-start; justify-content: center;
+  padding: 20px 12px;
+  overflow-y: auto;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px;
+  width: 100%; max-width: 480px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.modal-title { font-size: 16px; font-weight: 900; }
+.modal-close {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 20px; cursor: pointer; padding: 0 4px;
+}
+.modal-stats {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px; margin-bottom: 14px;
+}
+.modal-stat {
+  text-align: center; padding: 10px 6px;
+  background: var(--surface2); border-radius: 8px;
+}
+.modal-stat .v { font-size: 16px; font-weight: 900; color: var(--primary); }
+.modal-stat .l { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.modal-section {
+  margin-bottom: 14px;
+}
+.modal-section-title {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; margin-bottom: 6px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.word-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; margin-bottom: 4px;
+  font-size: 12px;
+}
+.word-item .kr { color: var(--muted); flex: 1; min-width: 0; padding-right: 8px; }
+.word-item .en { color: #43e97b; font-weight: 700; font-size: 13px; }
+.word-item.wrong { border-color: rgba(255,101,132,.3); background: rgba(255,101,132,.05); }
+.word-item.wrong .en { color: #ff6584; }
+.modal-actions { display: flex; gap: 6px; margin-top: 12px; }
+.modal-actions .btn { flex: 1; padding: 10px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -127,6 +183,17 @@
   <!-- 세션 목록 -->
   <div class="sess-list" id="sessList">
     <div class="empty-box">로딩 중...</div>
+  </div>
+</div>
+
+<!-- 세션 상세 모달 -->
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">세션 상세</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modalContent"></div>
   </div>
 </div>
 
@@ -207,7 +274,7 @@ function render() {
       : `<span class="sess-badge normal">${s.rounds_count}라운드</span>`;
     const wrongCount = JSON.parse(s.wrong_ids || '[]').length;
     return `
-      <div class="sess-item">
+      <div class="sess-item" data-id="${s.id}" style="cursor:pointer">
         <span class="sess-icon">${icon}</span>
         <div class="sess-main">
           <div class="sess-title">${s.situation || '전체'} · ${s.total_questions}문제</div>
@@ -215,13 +282,126 @@ function render() {
         </div>
         ${badge}
         <div class="sess-actions">
-          <button class="sess-btn" onclick="replaySession('${s.id}')">다시</button>
-          ${wrongCount > 0 ? `<button class="sess-btn" onclick="replayWrong('${s.id}')">오답</button>` : ''}
-          <button class="sess-btn danger" onclick="deleteSession('${s.id}')">✕</button>
+          <button class="sess-btn" onclick="event.stopPropagation();replaySession('${s.id}')">다시</button>
+          ${wrongCount > 0 ? `<button class="sess-btn" onclick="event.stopPropagation();replayWrong('${s.id}')">오답</button>` : ''}
+          <button class="sess-btn danger" onclick="event.stopPropagation();deleteSession('${s.id}')">✕</button>
         </div>
       </div>`;
   }).join('');
+  // 카드 클릭 시 상세 모달
+  list.querySelectorAll('.sess-item').forEach(el => {
+    el.onclick = () => openDetail(el.dataset.id);
+  });
 }
+
+/* ════════════════════════════════
+   상세 모달
+════════════════════════════════ */
+let allQuizzes = null;  // 캐시
+async function loadQuizzesOnce() {
+  if (allQuizzes) return allQuizzes;
+  const res = await API.getQuizzes('생활영어');
+  allQuizzes = (res.data || []);
+  return allQuizzes;
+}
+
+function extractKorean(q) {
+  let text = q.question || '';
+  if (q.type === 'translate') return text.replace(/를?\s*영어로.*$/, '').trim();
+  if (q.type === 'vocab') return text.replace(/(이?라는|의)\s*뜻의.*$/, '').replace(/를?\s*영어로.*$/, '').trim();
+  return text.replace(/(라고\s*(말|할)\s*때|할\s*때).*$/s, '').replace(/를?\s*영어로.*$/, '').replace(/가장\s*자연스러운.*$/, '').trim();
+}
+function getAnswer(q) {
+  const key = 'option_' + (q.answer || 'a').toLowerCase();
+  return q[key] || q.option_a;
+}
+
+async function openDetail(sessionId) {
+  const s = allSessions.find(x => x.id === sessionId);
+  if (!s) return;
+
+  const icon = SIT_EMOJI[s.situation] || '🎯';
+  const perfect = s.rounds_count === 1 && s.correct_first === s.total_questions;
+  const when = new Date(s.started_at).toLocaleString('ko-KR');
+  const minutes = Math.floor(s.duration_sec / 60);
+  const seconds = s.duration_sec % 60;
+  const timeStr = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+
+  document.getElementById('modalTitle').textContent = `${icon} ${s.situation || '전체'}`;
+
+  const container = document.getElementById('modalContent');
+  container.innerHTML = `
+    <div style="text-align:center;padding:16px 0 12px;background:linear-gradient(135deg,#1a1845,#1a2540);border-radius:12px;margin-bottom:14px">
+      <div style="font-size:40px;margin-bottom:4px">${perfect ? '🏆' : '🎉'}</div>
+      <div style="font-size:15px;font-weight:900">${perfect ? '퍼펙트!' : '학습 완료'}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">${when}</div>
+    </div>
+    <div class="modal-stats">
+      <div class="modal-stat"><div class="v">${s.total_questions}</div><div class="l">총 문제</div></div>
+      <div class="modal-stat"><div class="v">${s.rounds_count}</div><div class="l">라운드</div></div>
+      <div class="modal-stat"><div class="v">${timeStr}</div><div class="l">소요시간</div></div>
+    </div>
+    <div class="modal-stats">
+      <div class="modal-stat"><div class="v" style="color:#43e97b">${s.correct_first}</div><div class="l">첫 시도 정답</div></div>
+      <div class="modal-stat"><div class="v" style="color:#ff6584">${s.total_questions - s.correct_first}</div><div class="l">틀린 문제</div></div>
+      <div class="modal-stat"><div class="v" style="color:#f59e0b">+${s.xp_earned}</div><div class="l">XP</div></div>
+    </div>
+    <div id="wordSections"><div style="text-align:center;color:var(--muted);font-size:12px;padding:12px">문제 불러오는 중...</div></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="replaySession('${s.id}')">🔄 전체 다시풀기</button>
+      ${JSON.parse(s.wrong_ids||'[]').length > 0 ? `<button class="btn btn-accent" onclick="replayWrong('${s.id}')">📝 오답만</button>` : ''}
+    </div>
+  `;
+  document.getElementById('modal').classList.add('show');
+
+  // 문제 데이터 로드
+  try {
+    await loadQuizzesOnce();
+    const qIds = JSON.parse(s.question_ids || '[]');
+    const wrongIds = new Set(JSON.parse(s.wrong_ids || '[]'));
+    const qMap = {};
+    allQuizzes.forEach(q => qMap[q.id] = q);
+
+    const correctWords = [];
+    const wrongWords = [];
+    qIds.forEach(id => {
+      const q = qMap[id];
+      if (!q) return;
+      (wrongIds.has(id) ? wrongWords : correctWords).push(q);
+    });
+
+    const renderList = (arr, cls) => arr.map(q =>
+      `<div class="word-item ${cls}">
+        <span class="kr">${extractKorean(q)}</span>
+        <span class="en">${getAnswer(q)}</span>
+      </div>`).join('');
+
+    let html = '';
+    if (wrongWords.length > 0) {
+      html += `<div class="modal-section">
+        <div class="modal-section-title"><span>❌ 처음에 틀렸던 단어</span><span>${wrongWords.length}개</span></div>
+        ${renderList(wrongWords, 'wrong')}
+      </div>`;
+    }
+    if (correctWords.length > 0) {
+      html += `<div class="modal-section">
+        <div class="modal-section-title"><span>✅ 바로 맞춘 단어</span><span>${correctWords.length}개</span></div>
+        ${renderList(correctWords, '')}
+      </div>`;
+    }
+    document.getElementById('wordSections').innerHTML = html || '<div style="text-align:center;color:var(--muted);font-size:12px;padding:12px">문제 정보 없음</div>';
+  } catch(e) {
+    document.getElementById('wordSections').innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px;padding:12px">로드 실패</div>';
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+// 오버레이 클릭 시 닫기
+document.getElementById('modal').onclick = (e) => {
+  if (e.target.id === 'modal') closeModal();
+};
 
 async function replaySession(id) {
   try {
