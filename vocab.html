@@ -252,6 +252,58 @@
 
 .result-btns { display: flex; gap: 10px; flex-wrap: wrap; }
 .result-btns .btn { flex: 1; min-width: 120px; }
+
+/* ── 세션 요약 모달 ── */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 1000;
+  align-items: flex-start; justify-content: center;
+  padding: 20px 12px;
+  overflow-y: auto;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px;
+  width: 100%; max-width: 480px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.modal-title { font-size: 16px; font-weight: 900; }
+.modal-close {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 20px; cursor: pointer; padding: 0 4px;
+}
+.modal-stats {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px; margin-bottom: 10px;
+}
+.modal-stat {
+  text-align: center; padding: 10px 6px;
+  background: var(--surface2); border-radius: 8px;
+}
+.modal-stat .v { font-size: 16px; font-weight: 900; color: var(--primary); }
+.modal-stat .l { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.modal-section { margin-bottom: 14px; }
+.modal-section-title {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; margin-bottom: 6px;
+  display: flex; justify-content: space-between;
+}
+.word-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; margin-bottom: 4px;
+  font-size: 12px;
+}
+.word-item .kr { color: var(--muted); flex: 1; min-width: 0; padding-right: 8px; }
+.word-item .en { color: #43e97b; font-weight: 700; font-size: 13px; }
+.word-item.wrong { border-color: rgba(255,101,132,.3); background: rgba(255,101,132,.05); }
+.word-item.wrong .en { color: #ff6584; }
 </style>
 </head>
 <body>
@@ -407,6 +459,17 @@
   </div>
 </div>
 
+<!-- 세션 요약 모달 -->
+<div class="modal-overlay" id="summaryModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title" id="summaryTitle">요약</div>
+      <button class="modal-close" onclick="closeSummary()">✕</button>
+    </div>
+    <div id="summaryContent"></div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 
 <script src="js/api.js"></script>
@@ -528,22 +591,15 @@ async function loadRecentSessions() {
     SITUATIONS.forEach(s => sitMap[s.key] = s.emoji);
     container.innerHTML = sessions.map(s => {
       const icon = sitMap[s.situation] || '🎯';
-      const when = timeAgo(s.started_at);
-      const perfect = s.rounds_count === 1 && s.correct_first === s.total_questions;
-      const result = perfect ? '🏆 퍼펙트' : `${s.rounds_count}라운드 · ${s.correct_first}/${s.total_questions}`;
+      const area = s.situation || '전체';
       return `
-        <div class="session-item" data-id="${s.id}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:11px">
+        <div class="session-item" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:11px">
           <span style="font-size:16px">${icon}</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:700">${s.situation || '전체'}</div>
-            <div style="color:var(--muted);font-size:10px">${when} · ${result}</div>
-          </div>
-          <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px" onclick="event.stopPropagation();replaySession('${s.id}')">다시풀기</button>
+          <div style="flex:1;min-width:0;font-weight:700">${area}</div>
+          <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px" onclick="openSummary('${s.id}')">요약보기</button>
+          <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px" onclick="replaySession('${s.id}')">다시풀기</button>
         </div>`;
     }).join('');
-    container.querySelectorAll('.session-item').forEach(el => {
-      el.onclick = () => openSession(el.dataset.id);
-    });
   } catch(e) {
     console.warn('세션 로드 실패:', e);
     container.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px 0;text-align:center">불러오기 실패</div>';
@@ -563,23 +619,90 @@ async function replaySession(sessionId) {
   }
 }
 
-/* 세션 상세 보기 → 틀렸던 것만 재도전 */
-async function openSession(sessionId) {
+/* 세션 요약 모달 */
+const SIT_EMOJI = {
+  '가정생활':'🏠','직장업무':'💼','여행교통':'✈️','음식외식':'🍽️',
+  '쇼핑소비':'🛍️','의료건강':'🏥','교육학교':'📚','여가취미':'🎮',
+  '사회관계':'👥','긴급위기':'🚨','구동사':'🔗','경제비즈니스':'💰',
+  '랜덤':'🔀','오답복습':'📝','전체':'🌍',
+};
+
+async function openSummary(sessionId) {
   try {
     const s = await API.getSessionById(sessionId);
-    const wrongIds = JSON.parse(s.wrong_ids || '[]');
-    if (wrongIds.length === 0) {
-      showToast('🏆 이 세션은 모두 맞혔어요!', 'success');
-      return;
+    const icon = SIT_EMOJI[s.situation] || '🎯';
+    const perfect = s.rounds_count === 1 && s.correct_first === s.total_questions;
+    const when = new Date(s.started_at).toLocaleString('ko-KR');
+    const minutes = Math.floor(s.duration_sec / 60);
+    const seconds = s.duration_sec % 60;
+    const timeStr = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+
+    document.getElementById('summaryTitle').textContent = `${icon} ${s.situation || '전체'}`;
+
+    const qIds = JSON.parse(s.question_ids || '[]');
+    const wrongIds = new Set(JSON.parse(s.wrong_ids || '[]'));
+    const qMap = {};
+    allQuizzes.forEach(q => qMap[q.id] = q);
+
+    const correctWords = [];
+    const wrongWords = [];
+    qIds.forEach(id => {
+      const q = qMap[id];
+      if (!q) return;
+      (wrongIds.has(id) ? wrongWords : correctWords).push(q);
+    });
+
+    const renderList = (arr, cls) => arr.map(q =>
+      `<div class="word-item ${cls}">
+        <span class="kr">${extractKorean(q)}</span>
+        <span class="en">${getAnswer(q)}</span>
+      </div>`).join('');
+
+    let wordHtml = '';
+    if (wrongWords.length > 0) {
+      wordHtml += `<div class="modal-section">
+        <div class="modal-section-title"><span>❌ 처음에 틀렸던 단어</span><span>${wrongWords.length}개</span></div>
+        ${renderList(wrongWords, 'wrong')}
+      </div>`;
     }
-    if (!confirm(`이 세션에서 틀렸던 ${wrongIds.length}개 문제를 다시 풀어볼까요?`)) return;
-    const pool = allQuizzes.filter(q => wrongIds.includes(q.id));
-    if (pool.length === 0) { showToast('문제를 찾을 수 없습니다', 'error'); return; }
-    startSession(pool, { situation: s.situation + ' (오답)', mode: 'wrong_review' });
+    if (correctWords.length > 0) {
+      wordHtml += `<div class="modal-section">
+        <div class="modal-section-title"><span>✅ 바로 맞춘 단어</span><span>${correctWords.length}개</span></div>
+        ${renderList(correctWords, '')}
+      </div>`;
+    }
+    if (!wordHtml) wordHtml = '<div style="text-align:center;color:var(--muted);font-size:12px;padding:12px">문제 정보 없음</div>';
+
+    document.getElementById('summaryContent').innerHTML = `
+      <div style="text-align:center;padding:16px 0 12px;background:linear-gradient(135deg,#1a1845,#1a2540);border-radius:12px;margin-bottom:14px">
+        <div style="font-size:40px;margin-bottom:4px">${perfect ? '🏆' : '🎉'}</div>
+        <div style="font-size:15px;font-weight:900">${perfect ? '퍼펙트!' : '학습 완료'}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">${when}</div>
+      </div>
+      <div class="modal-stats">
+        <div class="modal-stat"><div class="v">${s.total_questions}</div><div class="l">총 문제</div></div>
+        <div class="modal-stat"><div class="v">${s.rounds_count}</div><div class="l">라운드</div></div>
+        <div class="modal-stat"><div class="v">${timeStr}</div><div class="l">소요시간</div></div>
+      </div>
+      <div class="modal-stats">
+        <div class="modal-stat"><div class="v" style="color:#43e97b">${s.correct_first}</div><div class="l">첫 시도 정답</div></div>
+        <div class="modal-stat"><div class="v" style="color:#ff6584">${s.total_questions - s.correct_first}</div><div class="l">틀린 문제</div></div>
+        <div class="modal-stat"><div class="v" style="color:#f59e0b">+${s.xp_earned}</div><div class="l">XP</div></div>
+      </div>
+      ${wordHtml}
+    `;
+    document.getElementById('summaryModal').classList.add('show');
   } catch(e) {
-    showToast('세션 로드 실패', 'error');
+    showToast('요약 로드 실패', 'error');
   }
 }
+
+function closeSummary() {
+  document.getElementById('summaryModal').classList.remove('show');
+}
+document.getElementById('summaryModal').onclick = (e) => {
+  if (e.target.id === 'summaryModal') closeSummary();
+};
 
 function updateStats() {
   const masteredCount = Object.values(progress).reduce((s, p) => s + (p.mastered || 0), 0);
