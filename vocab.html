@@ -302,6 +302,30 @@
 }
 .word-item .kr { color: var(--muted); flex: 1; min-width: 0; padding-right: 8px; }
 .word-item .en { color: #43e97b; font-weight: 700; font-size: 13px; }
+
+/* 전체 학습률 바 */
+.overall-box {
+  background: linear-gradient(135deg, rgba(108,99,255,.1), rgba(67,233,123,.08));
+  border: 1px solid rgba(108,99,255,.25);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+.overall-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 6px;
+}
+.overall-head .label { font-size: 11px; font-weight: 700; color: var(--muted); }
+.overall-head .val { font-size: 13px; font-weight: 800; color: var(--text); }
+.overall-head .pct { font-size: 16px; font-weight: 900; color: var(--primary); }
+.overall-bar {
+  height: 6px; background: var(--surface2);
+  border-radius: 99px; overflow: hidden;
+}
+.overall-bar .bar-fill {
+  height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 99px; transition: width .5s;
+}
 .word-item.wrong { border-color: rgba(255,101,132,.3); background: rgba(255,101,132,.05); }
 .word-item.wrong .en { color: #ff6584; }
 </style>
@@ -324,6 +348,15 @@
     <div class="sub">모를 때까지 반복 — 플래시카드로 완전 암기</div>
   </div>
 
+  <!-- 전체 학습률 -->
+  <div class="overall-box" id="overallProgress">
+    <div class="overall-head">
+      <span class="label">📚 전체 학습 진도</span>
+      <span><span class="val">0 / 0</span> · <span class="pct">0%</span></span>
+    </div>
+    <div class="overall-bar"><div class="bar-fill" style="width:0%"></div></div>
+  </div>
+
   <!-- 오늘의 학습 -->
   <div class="stat-row" id="statRow">
     <div class="stat-box">
@@ -332,7 +365,7 @@
     </div>
     <div class="stat-box">
       <div class="val" id="statMastered">0</div>
-      <div class="lbl">마스터</div>
+      <div class="lbl">학습완료</div>
     </div>
     <div class="stat-box">
       <div class="val" id="statWrong">0</div>
@@ -514,6 +547,7 @@ function saveStore(key, data) {
 }
 
 let wrongNotes = loadStore('qq_wrong_notes', {});
+let studiedIds = new Set();  // 학습한 문제 ID 집합 (세션 기반)
 let studyStats = loadStore('qq_study_stats', { totalStudied: 0, streak: 0, lastDate: '', todayCount: 0 });
 let progress   = loadStore('qq_study_progress', {});
 
@@ -557,6 +591,7 @@ async function init() {
     showToast('문제를 불러오지 못했습니다.', 'error');
   }
   hideLoading();
+  await loadStudiedIds();
   buildSitGrid();
   updateStats();
   loadRecentSessions();
@@ -572,6 +607,27 @@ async function init() {
         startSession(pool, { situation: situation || '복습', mode: 'replay' });
       }
     }
+  }
+}
+
+/* ════════════════════════════════
+   학습한 단어 ID 집계 (모든 세션)
+════════════════════════════════ */
+async function loadStudiedIds() {
+  try {
+    const res = await API.getSessions(user.id, 500);
+    const sessions = res.data || [];
+    const ids = new Set();
+    sessions.forEach(s => {
+      try {
+        const qIds = JSON.parse(s.question_ids || '[]');
+        qIds.forEach(id => ids.add(id));
+      } catch(e) {}
+    });
+    studiedIds = ids;
+  } catch(e) {
+    console.warn('학습 이력 로드 실패:', e);
+    studiedIds = new Set();
   }
 }
 
@@ -705,7 +761,7 @@ document.getElementById('summaryModal').onclick = (e) => {
 };
 
 function updateStats() {
-  const masteredCount = Object.values(progress).reduce((s, p) => s + (p.mastered || 0), 0);
+  const masteredCount = studiedIds.size;
   const wrongCount = Object.keys(wrongNotes).length;
   document.getElementById('statToday').textContent = studyStats.todayCount;
   document.getElementById('statMastered').textContent = masteredCount;
@@ -720,16 +776,17 @@ function buildSitGrid() {
   const grid = document.getElementById('sitGrid');
   grid.innerHTML = '';
   SITUATIONS.forEach(sit => {
-    const count = allQuizzes.filter(q => q.situation === sit.key).length;
-    const prog = progress[sit.key] || { total: count, mastered: 0 };
-    const pct = count > 0 ? Math.round((prog.mastered / count) * 100) : 0;
+    const sitQuizzes = allQuizzes.filter(q => q.situation === sit.key);
+    const count = sitQuizzes.length;
+    const studied = sitQuizzes.filter(q => studiedIds.has(q.id)).length;
+    const pct = count > 0 ? Math.round((studied / count) * 100) : 0;
 
     const btn = document.createElement('button');
     btn.className = 'sit-btn' + (selectedSit === sit.key ? ' active' : '');
     btn.innerHTML = `
       <span class="emoji">${sit.emoji}</span>
       <span class="name">${sit.key}</span>
-      <span class="cnt">${count}단어 · ${pct}%</span>
+      <span class="cnt">${studied}/${count} · ${pct}%</span>
       <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>`;
     btn.onclick = () => {
       selectedSit = selectedSit === sit.key ? null : sit.key;
@@ -737,6 +794,20 @@ function buildSitGrid() {
     };
     grid.appendChild(btn);
   });
+  updateOverallProgress();
+}
+
+/* 전체 학습률 계산 + 표시 */
+function updateOverallProgress() {
+  const total = allQuizzes.length;
+  const studied = allQuizzes.filter(q => studiedIds.has(q.id)).length;
+  const pct = total > 0 ? Math.round((studied / total) * 100) : 0;
+  const el = document.getElementById('overallProgress');
+  if (el) {
+    el.querySelector('.val').textContent = `${studied.toLocaleString()} / ${total.toLocaleString()}`;
+    el.querySelector('.pct').textContent = `${pct}%`;
+    el.querySelector('.bar-fill').style.width = `${pct}%`;
+  }
 }
 
 /* ════════════════════════════════
@@ -809,10 +880,11 @@ document.getElementById('btnWrongReview').onclick = () => {
   startSession(pool, { situation: '오답복습', mode: 'wrong_review' });
 };
 
-document.getElementById('quitBtn').onclick = () => {
+document.getElementById('quitBtn').onclick = async () => {
   document.getElementById('gameScreen').style.display = 'none';
   document.getElementById('setupScreen').style.display = 'block';
   updateStats();
+  await loadStudiedIds();
   buildSitGrid();
 };
 
@@ -985,9 +1057,10 @@ async function showResult() {
   updateStats();
 }
 
-document.getElementById('btnRetry').onclick = () => {
+document.getElementById('btnRetry').onclick = async () => {
   document.getElementById('resultScreen').style.display = 'none';
   document.getElementById('setupScreen').style.display = 'block';
+  await loadStudiedIds();
   buildSitGrid();
   loadRecentSessions();
 };
