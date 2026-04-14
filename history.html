@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>학습 기록 — 퀴즈퀴즈</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+* { user-select: none; }
+
+.mini-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 16px;
+  max-width: 520px; margin: 0 auto;
+}
+.mini-logo { font-size: 14px; font-weight: 800; color: var(--muted); text-decoration: none; }
+
+#wrap { max-width: 520px; margin: 0 auto; padding: 0 16px 40px; }
+
+.hist-hero {
+  text-align: center;
+  background: linear-gradient(135deg, #0d1f3c 0%, #1a1040 50%, #0d1f3c 100%);
+  border: 1px solid rgba(100,160,255,.25);
+  border-radius: 16px;
+  padding: 18px 20px 16px;
+  margin-bottom: 14px;
+}
+.hist-hero .icon { font-size: 32px; margin-bottom: 4px; }
+.hist-hero h2 { font-size: 18px; font-weight: 900; margin-bottom: 4px; }
+.hist-hero .sub { font-size: 12px; color: var(--muted); }
+
+/* 요약 통계 */
+.stat-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.stat-box {
+  flex: 1; text-align: center;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 6px;
+}
+.stat-box .val { font-size: 18px; font-weight: 900; color: var(--primary); }
+.stat-box .lbl { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+/* 필터 */
+.filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.filter-btn {
+  padding: 6px 12px; border: 1.5px solid var(--border);
+  border-radius: 99px; background: var(--surface2); color: var(--text);
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.filter-btn.active { border-color: var(--primary); background: rgba(108,99,255,.15); color: var(--primary); }
+
+/* 세션 목록 */
+.sess-list { display: flex; flex-direction: column; gap: 6px; }
+.sess-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px;
+}
+.sess-icon { font-size: 22px; }
+.sess-main { flex: 1; min-width: 0; }
+.sess-title { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+.sess-meta { color: var(--muted); font-size: 10px; }
+.sess-badge {
+  padding: 3px 8px; border-radius: 99px;
+  font-size: 10px; font-weight: 700;
+}
+.sess-badge.perfect { background: rgba(67,233,123,.15); color: #43e97b; }
+.sess-badge.normal  { background: rgba(108,99,255,.15); color: var(--primary); }
+.sess-actions { display: flex; gap: 4px; }
+.sess-btn {
+  padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface2); color: var(--text);
+  font-family: inherit; font-size: 10px; font-weight: 600;
+  cursor: pointer;
+}
+.sess-btn:hover { border-color: var(--primary); }
+.sess-btn.danger:hover { border-color: #ff6584; color: #ff6584; }
+
+.empty-box {
+  text-align: center; padding: 40px 20px;
+  background: var(--surface); border: 1px dashed var(--border);
+  border-radius: 12px; color: var(--muted); font-size: 13px;
+}
+</style>
+</head>
+<body>
+
+<div class="mini-header">
+  <a class="mini-logo" href="vocab.html">🎯 퀴즈퀴즈</a>
+  <a href="vocab.html" class="btn btn-ghost btn-sm">🏠 홈으로</a>
+</div>
+
+<div id="wrap">
+  <div class="hist-hero">
+    <div class="icon">📊</div>
+    <h2>학습 기록</h2>
+    <div class="sub">지금까지의 모든 학습 세션</div>
+  </div>
+
+  <!-- 요약 통계 -->
+  <div class="stat-row">
+    <div class="stat-box">
+      <div class="val" id="totalSessions">0</div>
+      <div class="lbl">총 세션</div>
+    </div>
+    <div class="stat-box">
+      <div class="val" id="totalQuestions">0</div>
+      <div class="lbl">푼 문제</div>
+    </div>
+    <div class="stat-box">
+      <div class="val" id="perfectCount">0</div>
+      <div class="lbl">퍼펙트</div>
+    </div>
+    <div class="stat-box">
+      <div class="val" id="totalTime">0</div>
+      <div class="lbl">총 분</div>
+    </div>
+  </div>
+
+  <!-- 필터 -->
+  <div class="filter-row" id="filterRow">
+    <button class="filter-btn active" data-filter="all">전체</button>
+  </div>
+
+  <!-- 세션 목록 -->
+  <div class="sess-list" id="sessList">
+    <div class="empty-box">로딩 중...</div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/constants.js"></script>
+<script>
+const user = Auth.require();
+if (!user) throw new Error('not logged in');
+
+const SIT_EMOJI = {
+  '가정생활':'🏠','직장업무':'💼','여행교통':'✈️','음식외식':'🍽️',
+  '쇼핑소비':'🛍️','의료건강':'🏥','교육학교':'📚','여가취미':'🎮',
+  '사회관계':'👥','긴급위기':'🚨','구동사':'🔗','경제비즈니스':'💰',
+  '랜덤':'🔀','오답복습':'📝','전체':'🌍',
+};
+
+let allSessions = [];
+let currentFilter = 'all';
+
+async function load() {
+  try {
+    const res = await API.getSessions(user.id, 200);
+    allSessions = res.data || [];
+    renderStats();
+    renderFilters();
+    render();
+  } catch(e) {
+    document.getElementById('sessList').innerHTML = '<div class="empty-box">불러오기 실패</div>';
+  }
+}
+
+function renderStats() {
+  const total = allSessions.length;
+  const totalQ = allSessions.reduce((s, x) => s + (x.total_questions || 0), 0);
+  const perfect = allSessions.filter(x => x.rounds_count === 1 && x.correct_first === x.total_questions).length;
+  const totalMin = Math.round(allSessions.reduce((s, x) => s + (x.duration_sec || 0), 0) / 60);
+  document.getElementById('totalSessions').textContent = total;
+  document.getElementById('totalQuestions').textContent = totalQ;
+  document.getElementById('perfectCount').textContent = perfect;
+  document.getElementById('totalTime').textContent = totalMin;
+}
+
+function renderFilters() {
+  const sits = [...new Set(allSessions.map(s => s.situation).filter(Boolean))];
+  const filterRow = document.getElementById('filterRow');
+  filterRow.innerHTML = '<button class="filter-btn active" data-filter="all">전체</button>' +
+    sits.map(s => `<button class="filter-btn" data-filter="${s}">${SIT_EMOJI[s] || '🎯'} ${s}</button>`).join('');
+  filterRow.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.onclick = () => {
+      filterRow.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      render();
+    };
+  });
+}
+
+function render() {
+  const list = document.getElementById('sessList');
+  let sessions = allSessions;
+  if (currentFilter !== 'all') {
+    sessions = sessions.filter(s => s.situation === currentFilter);
+  }
+  if (sessions.length === 0) {
+    list.innerHTML = '<div class="empty-box">기록이 없습니다</div>';
+    return;
+  }
+  list.innerHTML = sessions.map(s => {
+    const icon = SIT_EMOJI[s.situation] || '🎯';
+    const when = timeAgo(s.started_at);
+    const perfect = s.rounds_count === 1 && s.correct_first === s.total_questions;
+    const badge = perfect
+      ? '<span class="sess-badge perfect">🏆 퍼펙트</span>'
+      : `<span class="sess-badge normal">${s.rounds_count}라운드</span>`;
+    const wrongCount = JSON.parse(s.wrong_ids || '[]').length;
+    return `
+      <div class="sess-item">
+        <span class="sess-icon">${icon}</span>
+        <div class="sess-main">
+          <div class="sess-title">${s.situation || '전체'} · ${s.total_questions}문제</div>
+          <div class="sess-meta">${when} · ${s.correct_first}/${s.total_questions} 정답 · ${s.duration_sec}초</div>
+        </div>
+        ${badge}
+        <div class="sess-actions">
+          <button class="sess-btn" onclick="replaySession('${s.id}')">다시</button>
+          ${wrongCount > 0 ? `<button class="sess-btn" onclick="replayWrong('${s.id}')">오답</button>` : ''}
+          <button class="sess-btn danger" onclick="deleteSession('${s.id}')">✕</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function replaySession(id) {
+  try {
+    const s = await API.getSessionById(id);
+    sessionStorage.setItem('replay_session', JSON.stringify({ ids: JSON.parse(s.question_ids || '[]'), situation: s.situation + ' (복습)' }));
+    window.location.href = 'vocab.html?replay=1';
+  } catch(e) { showToast('실패', 'error'); }
+}
+
+async function replayWrong(id) {
+  try {
+    const s = await API.getSessionById(id);
+    const ids = JSON.parse(s.wrong_ids || '[]');
+    if (ids.length === 0) { showToast('오답이 없습니다', 'success'); return; }
+    sessionStorage.setItem('replay_session', JSON.stringify({ ids, situation: s.situation + ' (오답)' }));
+    window.location.href = 'vocab.html?replay=1';
+  } catch(e) { showToast('실패', 'error'); }
+}
+
+async function deleteSession(id) {
+  if (!confirm('이 세션을 삭제할까요?')) return;
+  try {
+    await API.deleteSession(id);
+    allSessions = allSessions.filter(s => s.id !== id);
+    renderStats();
+    render();
+    showToast('삭제됨', 'success');
+  } catch(e) { showToast('실패', 'error'); }
+}
+
+load();
+</script>
+</body>
+</html>

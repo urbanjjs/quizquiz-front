@@ -67,5 +67,19 @@ const API = {
   },
   async getRanking() {
     return this.req('GET', '/api/ranking');
+  },
+
+  /* ── study_sessions ── */
+  async saveSession(data) {
+    return this.req('POST', '/api/study_sessions', data);
+  },
+  async getSessions(userId, limit = 50) {
+    return this.req('GET', `/api/study_sessions?user_id=${encodeURIComponent(userId)}&limit=${limit}`);
+  },
+  async getSessionById(id) {
+    return this.req('GET', `/api/study_sessions/${id}`);
+  },
+  async deleteSession(id) {
+    return this.req('DELETE', `/api/study_sessions/${id}`);
   }
 };

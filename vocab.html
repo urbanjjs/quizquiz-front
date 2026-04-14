@@ -320,6 +320,17 @@
   </div>
 
   <button class="btn btn-primary btn-full" id="startBtn" style="margin-top:4px;padding:12px;font-size:14px">🚀 학습 시작</button>
+
+  <!-- 최근 학습 기록 -->
+  <div class="setup-card" style="margin-top:10px" id="historyCard">
+    <div class="setup-label" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📊 최근 학습 기록</span>
+      <a href="history.html" style="font-size:10px;color:var(--primary);text-decoration:none">전체 보기 →</a>
+    </div>
+    <div id="recentSessions" style="display:flex;flex-direction:column;gap:6px">
+      <div style="font-size:11px;color:var(--muted);padding:8px 0;text-align:center">로딩 중...</div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ 플래시카드 화면 ═══ -->
@@ -467,6 +478,9 @@ let roundNum = 1;
 let roundResults = [];  // [{round, total, correct}]
 let sessionWrong = [];
 let sessionCorrect = [];
+let sessionStart = 0;
+let sessionMeta = { situation: '', mode: 'flashcard', originalIds: [] };
+let firstRoundWrongIds = [];
 
 /* ════════════════════════════════
    초기화
@@ -482,6 +496,89 @@ async function init() {
   hideLoading();
   buildSitGrid();
   updateStats();
+  loadRecentSessions();
+
+  // history.html에서 replay 요청 처리
+  if (new URLSearchParams(location.search).get('replay') === '1') {
+    const data = sessionStorage.getItem('replay_session');
+    if (data) {
+      sessionStorage.removeItem('replay_session');
+      const { ids, situation } = JSON.parse(data);
+      const pool = allQuizzes.filter(q => ids.includes(q.id));
+      if (pool.length > 0) {
+        startSession(pool, { situation: situation || '복습', mode: 'replay' });
+      }
+    }
+  }
+}
+
+/* ════════════════════════════════
+   최근 학습 기록
+════════════════════════════════ */
+async function loadRecentSessions() {
+  const container = document.getElementById('recentSessions');
+  try {
+    const res = await API.getSessions(user.id, 5);
+    const sessions = res.data || [];
+    if (sessions.length === 0) {
+      container.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px 0;text-align:center">아직 학습 기록이 없습니다</div>';
+      return;
+    }
+    const sitMap = {};
+    SITUATIONS.forEach(s => sitMap[s.key] = s.emoji);
+    container.innerHTML = sessions.map(s => {
+      const icon = sitMap[s.situation] || '🎯';
+      const when = timeAgo(s.started_at);
+      const perfect = s.rounds_count === 1 && s.correct_first === s.total_questions;
+      const result = perfect ? '🏆 퍼펙트' : `${s.rounds_count}라운드 · ${s.correct_first}/${s.total_questions}`;
+      return `
+        <div class="session-item" data-id="${s.id}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:11px">
+          <span style="font-size:16px">${icon}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700">${s.situation || '전체'}</div>
+            <div style="color:var(--muted);font-size:10px">${when} · ${result}</div>
+          </div>
+          <button class="btn btn-ghost" style="padding:4px 8px;font-size:10px" onclick="event.stopPropagation();replaySession('${s.id}')">다시풀기</button>
+        </div>`;
+    }).join('');
+    container.querySelectorAll('.session-item').forEach(el => {
+      el.onclick = () => openSession(el.dataset.id);
+    });
+  } catch(e) {
+    console.warn('세션 로드 실패:', e);
+    container.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px 0;text-align:center">불러오기 실패</div>';
+  }
+}
+
+/* 세션 다시 풀기 (전체) */
+async function replaySession(sessionId) {
+  try {
+    const s = await API.getSessionById(sessionId);
+    const ids = JSON.parse(s.question_ids || '[]');
+    const pool = allQuizzes.filter(q => ids.includes(q.id));
+    if (pool.length === 0) { showToast('문제를 찾을 수 없습니다', 'error'); return; }
+    startSession(pool, { situation: s.situation + ' (복습)', mode: 'replay' });
+  } catch(e) {
+    showToast('세션 로드 실패', 'error');
+  }
+}
+
+/* 세션 상세 보기 → 틀렸던 것만 재도전 */
+async function openSession(sessionId) {
+  try {
+    const s = await API.getSessionById(sessionId);
+    const wrongIds = JSON.parse(s.wrong_ids || '[]');
+    if (wrongIds.length === 0) {
+      showToast('🏆 이 세션은 모두 맞혔어요!', 'success');
+      return;
+    }
+    if (!confirm(`이 세션에서 틀렸던 ${wrongIds.length}개 문제를 다시 풀어볼까요?`)) return;
+    const pool = allQuizzes.filter(q => wrongIds.includes(q.id));
+    if (pool.length === 0) { showToast('문제를 찾을 수 없습니다', 'error'); return; }
+    startSession(pool, { situation: s.situation + ' (오답)', mode: 'wrong_review' });
+  } catch(e) {
+    showToast('세션 로드 실패', 'error');
+  }
 }
 
 function updateStats() {
@@ -546,7 +643,7 @@ function getAnswer(q) {
 /* ════════════════════════════════
    세션 시작
 ════════════════════════════════ */
-function startSession(quizzes) {
+function startSession(quizzes, meta = {}) {
   if (quizzes.length === 0) {
     showToast('학습할 문제가 없습니다.', 'error');
     return;
@@ -557,6 +654,13 @@ function startSession(quizzes) {
   roundResults = [];
   sessionWrong = [];
   sessionCorrect = [];
+  firstRoundWrongIds = [];
+  sessionStart = Date.now();
+  sessionMeta = {
+    situation: meta.situation || '',
+    mode: meta.mode || 'flashcard',
+    originalIds: quizzes.map(q => q.id),
+  };
 
   document.getElementById('setupScreen').style.display = 'none';
   document.getElementById('resultScreen').style.display = 'none';
@@ -568,18 +672,18 @@ function startSession(quizzes) {
 document.getElementById('startBtn').onclick = () => {
   let pool = allQuizzes;
   if (selectedSit) pool = pool.filter(q => q.situation === selectedSit);
-  startSession(pool);
+  startSession(pool, { situation: selectedSit || '전체', mode: 'flashcard' });
 };
 
 document.getElementById('btnRandom').onclick = () => {
-  startSession(shuffle(allQuizzes).slice(0, 10));
+  startSession(shuffle(allQuizzes).slice(0, 10), { situation: '랜덤', mode: 'random' });
 };
 
 document.getElementById('btnWrongReview').onclick = () => {
   const wrongIds = Object.keys(wrongNotes);
   if (wrongIds.length === 0) { showToast('오답이 없습니다!', 'success'); return; }
   const pool = allQuizzes.filter(q => wrongIds.includes(q.id));
-  startSession(pool);
+  startSession(pool, { situation: '오답복습', mode: 'wrong_review' });
 };
 
 document.getElementById('quitBtn').onclick = () => {
@@ -671,6 +775,11 @@ function evaluate(known) {
     // 라운드 완료
     roundResults.push({ round: roundNum, total: quizQueue.length, correct: quizQueue.length - sessionWrong.length });
 
+    // 1라운드 오답 ID 기록
+    if (roundNum === 1) {
+      firstRoundWrongIds = sessionWrong.map(q => q.id);
+    }
+
     if (sessionWrong.length > 0) {
       // 틀린 것만 다음 라운드
       roundNum++;
@@ -691,12 +800,34 @@ function evaluate(known) {
 /* ════════════════════════════════
    결과 화면
 ════════════════════════════════ */
-function showResult() {
+async function showResult() {
   document.getElementById('gameScreen').style.display = 'none';
   document.getElementById('resultScreen').style.display = 'block';
 
   const totalQ = roundResults[0]?.total || 0;
   const totalRounds = roundResults.length;
+  const correctFirst = roundResults[0]?.correct || 0;
+  const duration = Math.round((Date.now() - sessionStart) / 1000);
+  const xp = totalQ * 2 + (totalRounds === 1 ? 10 : 0);
+
+  // 서버에 세션 저장
+  try {
+    await API.saveSession({
+      user_id: user.id,
+      started_at: sessionStart,
+      duration_sec: duration,
+      situation: sessionMeta.situation,
+      mode: sessionMeta.mode,
+      total_questions: totalQ,
+      rounds_count: totalRounds,
+      correct_first: correctFirst,
+      xp_earned: xp,
+      question_ids: JSON.stringify(sessionMeta.originalIds),
+      wrong_ids: JSON.stringify(firstRoundWrongIds),
+    });
+  } catch (e) {
+    console.warn('세션 저장 실패:', e);
+  }
 
   if (totalRounds === 1) {
     document.getElementById('resultIcon').textContent = '🏆';
@@ -735,6 +866,7 @@ document.getElementById('btnRetry').onclick = () => {
   document.getElementById('resultScreen').style.display = 'none';
   document.getElementById('setupScreen').style.display = 'block';
   buildSitGrid();
+  loadRecentSessions();
 };
 
 document.getElementById('btnWrongRetry').onclick = () => {
