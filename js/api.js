@@ -37,7 +37,7 @@ const API = {
   },
 
   /* ── quizzes ── */
-  async getQuizzes(category, limit = 10000) {
+  async getQuizzes(category, limit = 20000) {
     const url = category
       ? `/api/quizzes?search=${encodeURIComponent(category)}&limit=${limit}`
       : `/api/quizzes?limit=${limit}`;
