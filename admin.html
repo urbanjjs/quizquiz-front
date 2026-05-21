@@ -201,6 +201,10 @@ tr:hover td { background: rgba(108,99,255,.04); }
       <div class="stat-box"><div class="val" id="stat3">-</div><div class="lbl">언어/영어</div></div>
       <div class="stat-box"><div class="val" id="stat4">-</div><div class="lbl">시사/뉴스</div></div>
       <div class="stat-box" style="border-color:rgba(77,163,255,.4)"><div class="val" id="stat5" style="color:#7ec8ff">-</div><div class="lbl">생활영어</div></div>
+      <div class="stat-box" style="border-color:rgba(108,99,255,.4)"><div class="val" id="stat6" style="color:#a899ff">-</div><div class="lbl">비즈니스영어</div></div>
+      <div class="stat-box" style="border-color:rgba(67,233,123,.3)"><div class="val" id="stat7" style="color:#43e97b">-</div><div class="lbl">구동사</div></div>
+      <div class="stat-box" style="border-color:rgba(255,193,7,.3)"><div class="val" id="stat8" style="color:#ffc107">-</div><div class="lbl">고빈도어휘</div></div>
+      <div class="stat-box" style="border-color:rgba(255,100,130,.3)"><div class="val" id="stat9" style="color:#ff6482">-</div><div class="lbl">약국대화</div></div>
     </div>
 
     <!-- 필터 -->
@@ -213,6 +217,14 @@ tr:hover td { background: rgba(108,99,255,.04); }
         <option value="과학IT">과학/IT</option>
         <option value="언어영어">언어/영어</option>
         <option value="시사뉴스">시사/뉴스</option>
+        <option value="생활영어">🇺🇸 생활영어</option>
+        <option value="비즈니스영어">🏢 비즈니스영어</option>
+        <option value="구동사">🔄 구동사</option>
+        <option value="고빈도어휘">⭐ 고빈도어휘</option>
+        <option value="약국대화">💊 약국대화</option>
+      </select>
+      <select id="filterSitSub">
+        <option value="">전체 소분류</option>
       </select>
       <select id="filterType">
         <option value="">전체 유형</option>
@@ -236,14 +248,14 @@ tr:hover td { background: rgba(108,99,255,.04); }
             <th>#</th>
             <th>문제</th>
             <th>카테고리</th>
+            <th>소분류</th>
             <th>유형</th>
-            <th>정답</th>
             <th>난이도</th>
             <th>관리</th>
           </tr>
         </thead>
         <tbody id="quizTbody">
-          <tr><td colspan="7" style="text-align:center;padding:30px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          <tr><td colspan="8" style="text-align:center;padding:30px"><div class="spinner" style="margin:0 auto"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -543,8 +555,8 @@ let deleteTargetId = null;
 let pendingImport = [];
 let currentAnswerSel = 'A';
 
-const CATS = ['일반상식','역사사회','과학IT','언어영어','시사뉴스','생활영어'];
-const CAT_LABELS = {'일반상식':'🌍 일반상식','역사사회':'📜 역사/사회','과학IT':'🔬 과학/IT','언어영어':'🔤 언어/영어','시사뉴스':'📰 시사/뉴스','생활영어':'🇺🇸 생활영어'};
+const CATS = ['일반상식','역사사회','과학IT','언어영어','시사뉴스','생활영어','비즈니스영어','구동사','고빈도어휘','약국대화'];
+const CAT_LABELS = {'일반상식':'🌍 일반상식','역사사회':'📜 역사/사회','과학IT':'🔬 과학/IT','언어영어':'🔤 언어/영어','시사뉴스':'📰 시사/뉴스','생활영어':'🇺🇸 생활영어','비즈니스영어':'🏢 비즈니스영어','구동사':'🔄 구동사','고빈도어휘':'⭐ 고빈도어휘','약국대화':'💊 약국대화'};
 const DIFF_LABELS = {easy:'⭐ 쉬움', medium:'⭐⭐ 보통', hard:'⭐⭐⭐ 어려움'};
 
 /* ── 100개 상황 체계 정의 (10대 분야 × 10개 세부상황) ── */
@@ -598,10 +610,22 @@ async function loadAll() {
 
 function updateStats() {
   document.getElementById('statTotal').textContent = allQuizzes.length;
-  ['일반상식','역사사회','과학IT','언어영어','시사뉴스','생활영어'].forEach((cat, i) => {
+  ['일반상식','역사사회','과학IT','언어영어','시사뉴스','생활영어','비즈니스영어','구동사','고빈도어휘','약국대화'].forEach((cat, i) => {
     const el = document.getElementById('stat'+i);
     if (el) el.textContent = allQuizzes.filter(q => q.category === cat).length;
   });
+}
+
+/* ── 소분류 필터 셀렉트 업데이트 ── */
+function updateSitSubFilter(cat) {
+  const sel = document.getElementById('filterSitSub');
+  const prev = sel.value;
+  const subs = cat
+    ? [...new Set(allQuizzes.filter(q => q.category === cat && q.situation_sub).map(q => q.situation_sub))].sort()
+    : [];
+  sel.innerHTML = `<option value="">전체 소분류</option>` +
+    subs.map(s => `<option value="${s}">${s}</option>`).join('');
+  if (subs.includes(prev)) sel.value = prev;
 }
 
 /* ── 대분류 select 채우기 ── */
@@ -829,27 +853,35 @@ document.addEventListener('DOMContentLoaded', function() {
 function applyFilter() {
   const search = document.getElementById('searchInput').value.trim().toLowerCase();
   const cat    = document.getElementById('filterCat').value;
+  const sitSub = document.getElementById('filterSitSub').value;
   const type   = document.getElementById('filterType').value;
   const diff   = document.getElementById('filterDiff').value;
 
   filtered = allQuizzes.filter(q => {
-    if (cat  && q.category   !== cat)  return false;
-    if (type && q.type       !== type) return false;
-    if (diff && q.difficulty !== diff) return false;
-    if (search && !q.question.toLowerCase().includes(search)) return false;
+    if (cat    && q.category      !== cat)    return false;
+    if (sitSub && q.situation_sub !== sitSub) return false;
+    if (type   && q.type          !== type)   return false;
+    if (diff   && q.difficulty    !== diff)   return false;
+    if (search && !q.question.toLowerCase().includes(search) &&
+        !(q.situation_sub||'').toLowerCase().includes(search)) return false;
     return true;
   });
   currentPage = 1;
   renderTable();
 }
 
-['searchInput','filterCat','filterType','filterDiff'].forEach(id => {
+['searchInput','filterType','filterDiff','filterSitSub'].forEach(id => {
   document.getElementById(id).addEventListener('input', applyFilter);
   document.getElementById(id).addEventListener('change', applyFilter);
+});
+document.getElementById('filterCat').addEventListener('change', function() {
+  updateSitSubFilter(this.value);
+  applyFilter();
 });
 document.getElementById('resetFilterBtn').addEventListener('click', () => {
   document.getElementById('searchInput').value = '';
   document.getElementById('filterCat').value = '';
+  document.getElementById('filterSitSub').innerHTML = '<option value="">전체 소분류</option>';
   document.getElementById('filterType').value = '';
   document.getElementById('filterDiff').value = '';
   applyFilter();
@@ -863,12 +895,12 @@ function renderTable() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="emo">📭</div><p>문제가 없습니다.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="emo">📭</div><p>문제가 없습니다.</p></div></td></tr>`;
     document.getElementById('pagination').innerHTML = '';
     return;
   }
 
-  const typeLabel = { multiple:'4지선다', ox:'OX' };
+  const typeLabel = { multiple:'4지선다', ox:'OX', vocab:'어휘', expression:'표현', translate:'번역' };
   const diffBadge = { easy:'badge-accent', medium:'badge-yellow', hard:'badge-warn' };
 
   tbody.innerHTML = page.map((q, i) => `
@@ -876,13 +908,13 @@ function renderTable() {
       <td class="text-muted text-sm">${start + i + 1}</td>
       <td class="q-text-cell" title="${q.question}">${q.question}</td>
       <td><span class="badge badge-primary" style="font-size:11px">${CAT_LABELS[q.category]||q.category}</span></td>
+      <td class="text-muted" style="font-size:11px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${q.situation_sub||''}">${q.situation_sub||'-'}</td>
       <td><span class="badge ${q.type==='ox'?'badge-accent':'badge-primary'}">${typeLabel[q.type]||q.type}</span></td>
-      <td><span style="font-weight:900;color:var(--accent)">${q.answer}</span></td>
       <td><span class="badge ${diffBadge[q.difficulty]||''}">${DIFF_LABELS[q.difficulty]||q.difficulty}</span></td>
       <td>
         <div class="action-cell">
           <button class="btn btn-ghost btn-sm edit-btn" data-id="${q.id}">✏️</button>
-          <button class="btn btn-danger btn-sm delete-btn" data-id="${q.id}">🗑️</button>
+          <button class="btn btn-danger btn-sm delete-btn" data-id="${q.id}" data-q="${q.question.replace(/"/g,'&quot;')}">🗑️</button>
         </div>
       </td>
     </tr>`).join('');
@@ -978,7 +1010,7 @@ document.getElementById('saveQuizBtn').addEventListener('click', async () => {
     };
 
     if (editingId) {
-      await API.req('PATCH', `tables/quizzes/${editingId}`, data);
+      await API.req('PATCH', `/api/quizzes/${editingId}`, data);
       showToast('✅ 문제가 수정됐습니다!', 'success');
       editingId = null;
       document.getElementById('formTitle').textContent = '➕ 새 문제 추가';
@@ -987,7 +1019,7 @@ document.getElementById('saveQuizBtn').addEventListener('click', async () => {
       document.querySelector('[data-tab="add"]').className = 'tab-item';
       document.querySelector('[data-tab="list"]').click();
     } else {
-      await API.createRecord ? API.req('POST','tables/quizzes',data) : API.req('POST','tables/quizzes',data);
+      await API.req('POST', '/api/quizzes', data);
       showToast('✅ 문제가 추가됐습니다!', 'success');
     }
     resetForm();
@@ -1066,7 +1098,7 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', async () =
   if (!deleteTargetId) return;
   showLoading();
   try {
-    await API.req('DELETE', `tables/quizzes/${deleteTargetId}`);
+    await API.req('DELETE', `/api/quizzes/${deleteTargetId}`);
     document.getElementById('deleteModal').style.display = 'none';
     showToast('🗑️ 문제가 삭제됐습니다.', 'success');
     await loadAll();
@@ -1154,7 +1186,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   let success = 0, fail = 0;
   for (const item of pendingImport) {
     try {
-      await API.req('POST', 'tables/quizzes', {
+      await API.req('POST', '/api/quizzes', {
         id: Auth.uuid(),
         category: item.category,
         type: item.type,
